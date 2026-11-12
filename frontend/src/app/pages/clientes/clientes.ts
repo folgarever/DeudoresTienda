@@ -42,6 +42,14 @@ import { Cliente } from '../../models';
             />
             Solo clientes con deuda pendiente
           </label>
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              [(ngModel)]="incluirInactivos"
+              (change)="onBuscar()"
+            />
+            Mostrar clientes inactivos
+          </label>
         </div>
       </div>
 
@@ -82,14 +90,16 @@ import { Cliente } from '../../models';
             </thead>
             <tbody>
               @for (c of clientes(); track c.id) {
-                <tr>
+                <tr [class.row-inactivo]="!c.activo">
                   <td class="font-bold">
                     <a [routerLink]="['/clientes', c.id, 'historial']" class="client-link">
                       {{ c.nombre }} {{ c.apellido }}
                     </a>
                   </td>
                   <td>
-                    @if (c.saldo_pendiente > 0) {
+                    @if (!c.activo) {
+                      <span class="badge-uber badge-inactivo">Inactivo</span>
+                    } @else if (c.saldo_pendiente > 0) {
                       <span class="badge-uber badge-deuda">Debe Q{{ c.saldo_pendiente | number:'1.2-2' }}</span>
                     } @else {
                       <span class="badge-uber badge-saldado">Al día (Q0.00)</span>
@@ -100,23 +110,31 @@ import { Cliente } from '../../models';
                   </td>
                   <td class="text-right">
                     <div class="action-buttons">
-                      @if (c.saldo_pendiente > 0) {
-                        <a [routerLink]="['/abonos/nuevo']" [queryParams]="{ clienteId: c.id }" class="btn-uber btn-sm">
-                          Abonar
+                      @if (c.activo) {
+                        @if (c.saldo_pendiente > 0) {
+                          <a [routerLink]="['/abonos/nuevo']" [queryParams]="{ clienteId: c.id }" class="btn-uber btn-sm">
+                            Abonar
+                          </a>
+                        }
+                        <a [routerLink]="['/ventas/nueva']" [queryParams]="{ clienteId: c.id }" class="btn-uber btn-sm btn-uber-secondary">
+                          + Venta
                         </a>
                       }
-                      <a [routerLink]="['/ventas/nueva']" [queryParams]="{ clienteId: c.id }" class="btn-uber btn-sm btn-uber-secondary">
-                        + Venta
-                      </a>
                       <a [routerLink]="['/clientes', c.id, 'historial']" class="btn-uber btn-sm btn-uber-outline">
                         Historial
                       </a>
                       <button class="btn-uber btn-sm btn-uber-secondary" (click)="abrirModalEditar(c)">
                         Editar
                       </button>
-                      <button class="btn-uber btn-sm btn-uber-danger" (click)="desactivarCliente(c)" title="Desactivar cliente">
-                        ✕
-                      </button>
+                      @if (c.activo) {
+                        <button class="btn-uber btn-sm btn-uber-danger" (click)="desactivarCliente(c)" title="Desactivar cliente">
+                          ✕
+                        </button>
+                      } @else {
+                        <button class="btn-uber btn-sm" (click)="reactivarCliente(c)" title="Reactivar cliente">
+                          Reactivar
+                        </button>
+                      }
                     </div>
                   </td>
                 </tr>
@@ -203,6 +221,11 @@ import { Cliente } from '../../models';
       flex: 1;
       min-width: 260px;
     }
+    .filter-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+    }
     .checkbox-label {
       display: flex;
       align-items: center;
@@ -216,6 +239,14 @@ import { Cliente } from '../../models';
     }
     .debt-color {
       color: var(--color-black);
+    }
+    .row-inactivo {
+      opacity: 0.6;
+    }
+    .badge-inactivo {
+      background-color: var(--color-gray-hover);
+      color: var(--color-gray-dark);
+      border: 1px solid var(--color-gray-border-dark);
     }
     .action-buttons {
       display: inline-flex;
@@ -295,16 +326,21 @@ export class ClientesComponent implements OnInit {
 
   terminoBusqueda = '';
   soloConDeuda = false;
+  incluirInactivos = false;
 
   mostrarModal = signal<boolean>(false);
   clienteEnEdicion = signal<Cliente | null>(null);
   formNombre = '';
   formApellido = '';
+  private temporizadorExito?: ReturnType<typeof setTimeout>;
 
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
       if (params['soloConDeuda'] === 'true') {
         this.soloConDeuda = true;
+      }
+      if (params['incluirInactivos'] === 'true') {
+        this.incluirInactivos = true;
       }
       this.cargarClientes();
     });
@@ -314,7 +350,7 @@ export class ClientesComponent implements OnInit {
     this.cargando.set(true);
     this.errorMensaje.set(null);
 
-    this.clienteService.listar(this.terminoBusqueda, this.soloConDeuda).subscribe({
+    this.clienteService.listar(this.terminoBusqueda, this.soloConDeuda, this.incluirInactivos).subscribe({
       next: (res) => {
         this.cargando.set(false);
         this.clientes.set(res.data || []);
@@ -328,6 +364,14 @@ export class ClientesComponent implements OnInit {
 
   onBuscar(): void {
     this.cargarClientes();
+  }
+
+  private mostrarExito(mensaje: string): void {
+    this.mensajeExito.set(mensaje);
+    if (this.temporizadorExito) {
+      clearTimeout(this.temporizadorExito);
+    }
+    this.temporizadorExito = setTimeout(() => this.mensajeExito.set(null), 3000);
   }
 
   abrirModalCrear(): void {
@@ -370,8 +414,7 @@ export class ClientesComponent implements OnInit {
         next: () => {
           this.guardando.set(false);
           this.cerrarModal();
-          this.mensajeExito.set('Cliente actualizado exitosamente');
-          setTimeout(() => this.mensajeExito.set(null), 3000);
+          this.mostrarExito('Cliente actualizado exitosamente');
           this.cargarClientes();
         },
         error: (err) => {
@@ -384,8 +427,7 @@ export class ClientesComponent implements OnInit {
         next: () => {
           this.guardando.set(false);
           this.cerrarModal();
-          this.mensajeExito.set('Cliente registrado exitosamente');
-          setTimeout(() => this.mensajeExito.set(null), 3000);
+          this.mostrarExito('Cliente registrado exitosamente');
           this.cargarClientes();
         },
         error: (err) => {
@@ -402,12 +444,23 @@ export class ClientesComponent implements OnInit {
 
     this.clienteService.desactivar(cliente.id).subscribe({
       next: () => {
-        this.mensajeExito.set('Cliente desactivado conservando su historial.');
-        setTimeout(() => this.mensajeExito.set(null), 3000);
+        this.mostrarExito('Cliente desactivado conservando su historial.');
         this.cargarClientes();
       },
       error: (err) => {
         this.errorMensaje.set(err.error?.message || 'Error al desactivar cliente');
+      }
+    });
+  }
+
+  reactivarCliente(cliente: Cliente): void {
+    this.clienteService.reactivar(cliente.id).subscribe({
+      next: () => {
+        this.mostrarExito('Cliente reactivado exitosamente.');
+        this.cargarClientes();
+      },
+      error: (err) => {
+        this.errorMensaje.set(err.error?.message || 'Error al reactivar cliente');
       }
     });
   }

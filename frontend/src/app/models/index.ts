@@ -116,6 +116,7 @@ export interface DashboardStats {
   clientes_con_deuda: number;
   total_dinero_por_cobrar: number;
   total_compras_registradas: number;
+  total_dinero_vendido: number;
   total_dinero_abonado: number;
   compras_recientes: Compra[];
   ultimos_abonos: AbonoPago[];
