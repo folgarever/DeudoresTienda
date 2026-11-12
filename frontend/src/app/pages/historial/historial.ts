@@ -172,8 +172,17 @@ import { ResumenHistorialCliente } from '../../models';
     }
 
     .debt-highlight {
-      background-color: var(--color-gray-light);
+      background-color: var(--color-black);
       border-color: var(--color-black);
+    }
+
+    .debt-highlight .stat-label,
+    .debt-highlight .stat-meta {
+      color: #B9B9B9;
+    }
+
+    .debt-highlight .stat-value {
+      color: var(--color-white);
     }
 
     .stat-label {

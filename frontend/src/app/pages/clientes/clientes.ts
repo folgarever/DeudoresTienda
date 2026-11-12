@@ -24,10 +24,11 @@ import { Cliente } from '../../models';
 
       <!-- Barra de Filtros y Búsqueda -->
       <div class="card-uber filters-card">
-        <div class="search-box">
+        <div class="search-box input-wrap">
+          <svg class="input-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input
             type="text"
-            class="form-control"
+            class="form-control has-icon"
             placeholder="Buscar cliente por nombre o apellido..."
             [(ngModel)]="terminoBusqueda"
             (input)="onBuscar()"
@@ -220,6 +221,20 @@ import { Cliente } from '../../models';
     .search-box {
       flex: 1;
       min-width: 260px;
+      position: relative;
+    }
+    .input-ico {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 17px;
+      height: 17px;
+      color: var(--color-gray-soft);
+      pointer-events: none;
+    }
+    .form-control.has-icon {
+      padding-left: 42px;
     }
     .filter-options {
       display: flex;
@@ -242,11 +257,6 @@ import { Cliente } from '../../models';
     }
     .row-inactivo {
       opacity: 0.6;
-    }
-    .badge-inactivo {
-      background-color: var(--color-gray-hover);
-      color: var(--color-gray-dark);
-      border: 1px solid var(--color-gray-border-dark);
     }
     .action-buttons {
       display: inline-flex;
