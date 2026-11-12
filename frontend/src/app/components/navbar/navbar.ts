@@ -14,6 +14,15 @@ export class NavbarComponent {
   authService = inject(AuthService);
   menuOpen = false;
 
+  initials(): string {
+    const user = this.authService.currentUser();
+    if (!user) return '?';
+    const primera = user.nombres?.trim().charAt(0) || '';
+    const segunda = user.apellidos?.trim().charAt(0) || '';
+    const resultado = `${primera}${segunda}`.toUpperCase();
+    return resultado || user.username?.charAt(0).toUpperCase() || '?';
+  }
+
   toggleMenu(): void {
     this.menuOpen = !this.menuOpen;
   }
