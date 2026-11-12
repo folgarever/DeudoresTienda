@@ -48,3 +48,54 @@ DeudoresTienda/
 - Rama de trabajo exclusiva: `folgarever`.
 - Identidad de autor: `FolgarEver` (`folgarever`).
 - Estándar de mensajes de commit: **Conventional Commits** en español (`feat:`, `fix:`, `docs:`, `chore:`, etc.).
+
+---
+
+## 5. Guía de Despliegue en Vercel (24/7 en la Nube)
+
+La aplicación está preparada para funcionar permanentemente en internet sin depender de tener la computadora encendida:
+
+1. Ingresar a [vercel.com](https://vercel.com) e iniciar sesión con tu cuenta de GitHub.
+2. Hacer clic en **Add New... > Project** y seleccionar el repositorio `folgarever/DeudoresTienda`.
+3. Seleccionar la rama `folgarever`.
+4. En **Environment Variables**, agregar las siguientes variables:
+   - `SUPABASE_URL`: La URL de tu proyecto Supabase (ej. `https://xxxx.supabase.co`).
+   - `SUPABASE_SERVICE_ROLE_KEY`: Tu clave secreta `service_role` de Supabase.
+   - `SUPABASE_ANON_KEY`: Tu clave pública `anon` de Supabase.
+   - `JWT_SECRET`: Una clave secreta larga y segura para firmar los tokens de sesión.
+   - `JWT_EXPIRES_IN`: `7d`
+   - `NODE_ENV`: `production`
+5. Hacer clic en **Deploy**.
+6. Vercel compilará automáticamente el frontend en Angular, desplegará la API en Serverless Functions bajo `/api/*` y publicará la aplicación con certificado SSL (HTTPS) gratuito en un dominio `.vercel.app`.
+
+---
+
+## 6. Ejecución y Pruebas en Entorno Local
+
+### Backend:
+```bash
+cd backend
+npm install
+npm run dev        # Inicia con recarga automatica en http://localhost:3000
+npm run build      # Compila TypeScript a dist/
+```
+
+### Frontend:
+```bash
+cd frontend
+npm install
+npm start          # Inicia Angular CLI en http://localhost:4200
+npm run build      # Genera bundle optimizado de produccion
+```
+
+---
+
+## 7. Módulos y Flujo Operativo
+
+- **Autenticación:** `/login` y `/registro` con validación de credenciales únicas y contraseñas cifradas con `bcrypt`.
+- **Dashboard:** `/dashboard` con indicadores en tiempo real (clientes, deudores, total por cobrar `Q`, ventas, abonos y Top 10 deudores).
+- **Clientes:** `/clientes` con buscador en vivo, filtro de deudores, creación rápida (sólo Nombre y Apellido) y desactivación lógica que protege el historial.
+- **Ventas y Compras:** `/ventas/nueva` para agregar productos libres con cantidad y precio unitario manual; suma atómicamente a la deuda pendiente del cliente.
+- **Abonos y Pagos:** `/abonos/nuevo` con botón de pago completo, validación estricta que prohíbe abonos negativos o mayores a la deuda y resta el saldo pendiente en tiempo real.
+- **Historial Individual:** `/clientes/:id/historial` con resumen acumulado y tabla cronológica de compras y abonos con saldo anterior y posterior en cada movimiento.
+

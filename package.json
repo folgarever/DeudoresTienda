@@ -1,0 +1,12 @@
+{
+  "name": "deudores-tienda",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de Control de Clientes, Ventas y Deudas",
+  "scripts": {
+    "build": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "build:all": "cd backend && npm run build && cd ../frontend && npm run build",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  }
+}
