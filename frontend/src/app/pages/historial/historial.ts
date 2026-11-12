@@ -2,7 +2,8 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HistorialService } from '../../services/historial.service';
-import { ResumenHistorialCliente } from '../../models';
+import { CompraService } from '../../services/compra.service';
+import { Compra, ResumenHistorialCliente } from '../../models';
 
 @Component({
   selector: 'app-historial',
@@ -82,6 +83,84 @@ import { ResumenHistorialCliente } from '../../models';
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Detalle de Compras y Productos Anotados -->
+        <div class="section-container mt-32">
+          <div class="section-header">
+            <h2 class="section-title">Compras y Productos Anotados</h2>
+            <p class="text-muted">Detalle de cada compra registrada: qué productos llevó, cantidades y precios</p>
+          </div>
+
+          @if (cargandoCompras()) {
+            <div class="loading-state">
+              <p>Cargando compras del cliente...</p>
+            </div>
+          } @else if (compras().length === 0) {
+            <div class="card-uber empty-card">
+              <p>Este cliente aún no tiene compras registradas.</p>
+            </div>
+          } @else {
+            <div class="compras-list">
+              @for (c of compras(); track c.id) {
+                <div class="card-uber compra-card">
+                  <div class="compra-head">
+                    <div>
+                      <div class="compra-fecha">
+                        Compra del {{ c.fecha_compra | date:'dd/MM/yyyy' }}
+                        <span class="text-muted">· {{ c.fecha_compra | date:'HH:mm' }}</span>
+                      </div>
+                      <div class="compra-meta text-muted">
+                        {{ (c.detalles?.length || 0) }} producto(s) anotado(s)
+                      </div>
+                    </div>
+                    <div class="compra-right">
+                      <span
+                        class="badge-uber"
+                        [class.badge-saldado]="c.estado_pago === 'PAGADO'"
+                        [class.badge-parcial]="c.estado_pago === 'PARCIAL'"
+                        [class.badge-deuda]="c.estado_pago === 'PENDIENTE'"
+                      >
+                        {{ c.estado_pago === 'PAGADO' ? 'Pagado' : (c.estado_pago === 'PARCIAL' ? 'Parcial' : 'Pendiente') }}
+                      </span>
+                      <span class="compra-total font-mono">Q{{ c.total | number:'1.2-2' }}</span>
+                    </div>
+                  </div>
+
+                  @if (c.detalles && c.detalles.length > 0) {
+                    <div class="table-container mt-12">
+                      <table class="table-uber">
+                        <thead>
+                          <tr>
+                            <th>Producto</th>
+                            <th class="text-right">Cantidad</th>
+                            <th class="text-right">Precio unitario</th>
+                            <th class="text-right">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (d of c.detalles; track d.id) {
+                            <tr>
+                              <td>{{ d.descripcion_producto }}</td>
+                              <td class="text-right font-mono">{{ d.cantidad }}</td>
+                              <td class="text-right font-mono">Q{{ d.precio_unitario | number:'1.2-2' }}</td>
+                              <td class="text-right font-mono font-bold">Q{{ d.subtotal | number:'1.2-2' }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colspan="3" class="text-right font-bold">Total de la compra</td>
+                            <td class="text-right font-mono font-bold">Q{{ c.total | number:'1.2-2' }}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
         </div>
 
         <!-- Tabla Cronológica de Movimientos -->
@@ -218,6 +297,53 @@ import { ResumenHistorialCliente } from '../../models';
       margin-bottom: 16px;
     }
 
+    .compras-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .compra-card {
+      padding: 18px 20px;
+    }
+
+    .compra-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .compra-fecha {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .compra-meta {
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .compra-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .compra-total {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .table-uber tfoot td {
+      background-color: var(--color-surface-muted);
+      border-top: 1px solid var(--color-gray-border);
+      border-bottom: none;
+      font-size: 13px;
+    }
+
     .amount-buy {
       color: #000000;
     }
@@ -253,17 +379,38 @@ import { ResumenHistorialCliente } from '../../models';
 })
 export class HistorialComponent implements OnInit {
   private historialService = inject(HistorialService);
+  private compraService = inject(CompraService);
   private route = inject(ActivatedRoute);
 
   historial = signal<ResumenHistorialCliente | null>(null);
   cargando = signal<boolean>(true);
   errorMensaje = signal<string | null>(null);
 
+  compras = signal<Compra[]>([]);
+  cargandoCompras = signal<boolean>(true);
+
   ngOnInit(): void {
     this.route.params.subscribe((params) => {
       const clienteId = params['id'];
       if (clienteId) {
         this.cargarHistorial(clienteId);
+        this.cargarCompras(clienteId);
+      }
+    });
+  }
+
+  cargarCompras(clienteId: string): void {
+    this.cargandoCompras.set(true);
+    this.compraService.listar(clienteId, 200).subscribe({
+      next: (res) => {
+        this.cargandoCompras.set(false);
+        if (res.success && res.data) {
+          this.compras.set(res.data);
+        }
+      },
+      error: () => {
+        this.cargandoCompras.set(false);
+        this.compras.set([]);
       }
     });
   }
