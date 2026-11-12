@@ -120,6 +120,18 @@ CREATE TABLE IF NOT EXISTS movimientos_financieros (
 CREATE INDEX IF NOT EXISTS idx_movimientos_cliente ON movimientos_financieros(cliente_id, fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_movimientos_user ON movimientos_financieros(user_id, fecha DESC);
 
+-- -----------------------------------------------------------------------------
+-- PERMISOS Y POLITICAS DE SEGURIDAD (RLS)
+-- Como la API de Node.js gestiona internamente la autenticacion JWT y el
+-- aislamiento de datos por user_id, se deshabilita RLS en estas tablas.
+-- -----------------------------------------------------------------------------
+ALTER TABLE usuarios DISABLE ROW LEVEL SECURITY;
+ALTER TABLE clientes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE compras DISABLE ROW LEVEL SECURITY;
+ALTER TABLE detalles_compra DISABLE ROW LEVEL SECURITY;
+ALTER TABLE abonos_pagos DISABLE ROW LEVEL SECURITY;
+ALTER TABLE movimientos_financieros DISABLE ROW LEVEL SECURITY;
+
 -- =============================================================================
 -- FUNCIONES TRANSACCIONALES RPC (Integridad Absoluta)
 -- =============================================================================
