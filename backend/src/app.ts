@@ -54,3 +54,4 @@ export function createApp(): Application {
 }
 
 export const app = createApp();
+export default app;
