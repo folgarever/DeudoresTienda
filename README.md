@@ -2,6 +2,8 @@
 
 Aplicación web profesional para la administración de clientes, cuentas por cobrar, registro de ventas y control estricto de abonos/pagos de una tienda, con persistencia remota segura en **Supabase (PostgreSQL)** y despliegue continuo en **Vercel**.
 
+[![Despliegue en Vercel](https://therealsujitk-vercel-badge.vercel.app/?app=deudores-tienda)](https://vercel.com)
+
 ---
 
 ## 1. Características Principales
