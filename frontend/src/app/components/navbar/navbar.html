@@ -1,0 +1,50 @@
+<nav class="navbar-uber">
+  <div class="navbar-container">
+    <!-- Logotipo / Marca -->
+    <a routerLink="/dashboard" class="navbar-brand" (click)="closeMenu()">
+      <span class="brand-text">DeudoresTienda</span>
+    </a>
+
+    <!-- Boton Hamburguesa para Movil -->
+    @if (authService.isAuthenticated()) {
+      <button class="navbar-toggle" (click)="toggleMenu()" aria-label="Abrir menú">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+    }
+
+    <!-- Enlaces y Acciones -->
+    @if (authService.isAuthenticated()) {
+      <div class="navbar-links" [class.open]="menuOpen">
+        <div class="nav-items">
+          <a routerLink="/dashboard" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+            Dashboard
+          </a>
+          <a routerLink="/clientes" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+            Clientes
+          </a>
+          <a routerLink="/ventas/nueva" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+            + Nueva Compra
+          </a>
+          <a routerLink="/abonos/nuevo" routerLinkActive="active" class="nav-link" (click)="closeMenu()">
+            + Registrar Abono
+          </a>
+        </div>
+
+        <div class="nav-user-section">
+          @if (authService.currentUser(); as user) {
+            <span class="user-greeting">
+              {{ user.nombres }} ({{ user.username }})
+            </span>
+          }
+          <button class="btn-logout" (click)="logout()">
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</nav>

@@ -1,0 +1,147 @@
+.navbar-uber {
+  background-color: #000000;
+  color: #FFFFFF;
+  border-bottom: 1px solid #222222;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+}
+
+.navbar-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #FFFFFF;
+}
+
+.brand-text {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.navbar-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #FFFFFF;
+  cursor: pointer;
+  padding: 8px;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  margin-left: 32px;
+}
+
+.nav-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-link {
+  color: #AFAFAF;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.15s ease-in-out;
+}
+
+.nav-link:hover {
+  color: #FFFFFF;
+  background-color: #1a1a1a;
+}
+
+.nav-link.active {
+  color: #FFFFFF;
+  background-color: #262626;
+}
+
+.nav-user-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-greeting {
+  font-size: 13px;
+  color: #AFAFAF;
+}
+
+.btn-logout {
+  background-color: transparent;
+  color: #FFFFFF;
+  border: 1px solid #444444;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn-logout:hover {
+  background-color: #FFFFFF;
+  color: #000000;
+  border-color: #FFFFFF;
+}
+
+/* Adaptabilidad móvil */
+@media (max-width: 860px) {
+  .navbar-toggle {
+    display: block;
+  }
+
+  .navbar-links {
+    display: none;
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    background-color: #000000;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    margin-left: 0;
+    border-bottom: 1px solid #333333;
+    gap: 16px;
+  }
+
+  .navbar-links.open {
+    display: flex;
+  }
+
+  .nav-items {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    gap: 4px;
+  }
+
+  .nav-link {
+    width: 100%;
+    padding: 10px 12px;
+  }
+
+  .nav-user-section {
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid #222222;
+  }
+}
