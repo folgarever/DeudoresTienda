@@ -1,4 +1,4 @@
-import express, { Application, Request, Response } from 'express';
+import express, { Application, Request, Response, Router } from 'express';
 import cors from 'cors';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import authRoutes from './routes/authRoutes';
@@ -21,8 +21,11 @@ export function createApp(): Application {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Router de API
+  const apiRouter = Router();
+
   // Endpoint de comprobacion de estado (Health Check)
-  app.get('/api/health', (_req: Request, res: Response) => {
+  apiRouter.get('/health', (_req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       service: 'DeudoresTienda API',
@@ -32,12 +35,16 @@ export function createApp(): Application {
   });
 
   // Rutas de modulos
-  app.use('/api/auth', authRoutes);
-  app.use('/api/clientes', clienteRoutes);
-  app.use('/api/compras', compraRoutes);
-  app.use('/api/abonos', abonoRoutes);
-  app.use('/api/historial', historialRoutes);
-  app.use('/api/dashboard', dashboardRoutes);
+  apiRouter.use('/auth', authRoutes);
+  apiRouter.use('/clientes', clienteRoutes);
+  apiRouter.use('/compras', compraRoutes);
+  apiRouter.use('/abonos', abonoRoutes);
+  apiRouter.use('/historial', historialRoutes);
+  apiRouter.use('/dashboard', dashboardRoutes);
+
+  // Compatible tanto con prefijo /api como con rutas directas en Serverless
+  app.use('/api', apiRouter);
+  app.use('/', apiRouter);
 
   // Manejo de rutas no encontradas y errores globales
   app.use(notFoundHandler);
