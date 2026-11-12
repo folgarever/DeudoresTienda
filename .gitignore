@@ -1,0 +1,42 @@
+# Dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Compilacion y distribucion
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+
+# Entornos y secretos
+.env
+.env.local
+.env.*.local
+*.env
+
+# Angular
+.angular/
+.cache/
+
+# IDEs y editores
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Sistema operativo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs
+logs/
+*.log
