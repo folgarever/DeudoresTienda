@@ -4,6 +4,7 @@ import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import authRoutes from './routes/authRoutes';
 import clienteRoutes from './routes/clienteRoutes';
 import compraRoutes from './routes/compraRoutes';
+import abonoRoutes from './routes/abonoRoutes';
 
 export function createApp(): Application {
   const app: Application = express();
@@ -32,6 +33,7 @@ export function createApp(): Application {
   app.use('/api/auth', authRoutes);
   app.use('/api/clientes', clienteRoutes);
   app.use('/api/compras', compraRoutes);
+  app.use('/api/abonos', abonoRoutes);
 
   // Manejo de rutas no encontradas y errores globales
   app.use(notFoundHandler);
