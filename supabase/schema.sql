@@ -137,6 +137,49 @@ ALTER TABLE movimientos_financieros DISABLE ROW LEVEL SECURITY;
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
+-- FUNCION: recalcular_estados_pago_cliente
+-- Recalcula compras.estado_pago (PENDIENTE/PARCIAL/PAGADO) aplicando los abonos
+-- registrados en orden cronologico (FIFO) sobre las compras mas antiguas.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION recalcular_estados_pago_cliente(
+    p_user_id UUID,
+    p_cliente_id UUID
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_total_abonado NUMERIC(12, 2);
+    v_acumulado NUMERIC(12, 2) := 0.00;
+    v_compra RECORD;
+    v_estado VARCHAR(20);
+BEGIN
+    SELECT COALESCE(SUM(monto), 0.00) INTO v_total_abonado
+    FROM abonos_pagos
+    WHERE cliente_id = p_cliente_id AND user_id = p_user_id;
+
+    FOR v_compra IN
+        SELECT id, total
+        FROM compras
+        WHERE cliente_id = p_cliente_id AND user_id = p_user_id
+        ORDER BY fecha_compra ASC, created_at ASC
+    LOOP
+        IF v_total_abonado >= v_acumulado + v_compra.total THEN
+            v_estado := 'PAGADO';
+        ELSIF v_total_abonado > v_acumulado THEN
+            v_estado := 'PARCIAL';
+        ELSE
+            v_estado := 'PENDIENTE';
+        END IF;
+
+        UPDATE compras SET estado_pago = v_estado WHERE id = v_compra.id;
+        v_acumulado := v_acumulado + v_compra.total;
+    END LOOP;
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
 -- FUNCION: registrar_compra_transaccional
 -- Registra la compra, sus detalles, incrementa el saldo y anota el movimiento
 -- -----------------------------------------------------------------------------
@@ -271,7 +314,10 @@ BEGIN
         v_fecha_efectiva
     );
 
-    -- 8. Retornar resultado estructurado
+    -- 8. Recalcular el estado de pago de las compras del cliente
+    PERFORM recalcular_estados_pago_cliente(p_user_id, p_cliente_id);
+
+    -- 9. Retornar resultado estructurado
     RETURN jsonb_build_object(
         'compra_id', v_compra_id,
         'total', v_total,
@@ -388,7 +434,10 @@ BEGIN
         v_fecha_efectiva
     );
 
-    -- 8. Retornar resultado
+    -- 8. Recalcular el estado de pago de las compras del cliente
+    PERFORM recalcular_estados_pago_cliente(p_user_id, p_cliente_id);
+
+    -- 9. Retornar resultado
     RETURN jsonb_build_object(
         'abono_id', v_abono_id,
         'monto', p_monto,

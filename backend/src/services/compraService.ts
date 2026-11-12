@@ -1,11 +1,47 @@
 import { supabase } from '../config/supabase';
 import { RegistrarCompraDTO, Compra, DetalleCompra, ItemCompraDTO } from '../types/compra';
+import { Paginacion } from '../utils/pagination';
 import { AppError } from '../middlewares/errorHandler';
+
+const MAX_DESCRIPCION = 255;
 
 function createCompraError(message: string, statusCode: number = 400): AppError {
   const err = new Error(message) as AppError;
   err.statusCode = statusCode;
   return err;
+}
+
+function normalizarCompra(c: Record<string, unknown>): Compra {
+  return {
+    ...(c as unknown as Compra),
+    total: Number(c.total),
+    saldo_generado: Number(c.saldo_generado),
+    detalles: ((c.detalles as DetalleCompra[]) || []).map((d) => ({
+      ...d,
+      cantidad: Number(d.cantidad),
+      precio_unitario: Number(d.precio_unitario),
+      subtotal: Number(d.subtotal),
+    })),
+  };
+}
+
+// Detecta si el error de la RPC corresponde a que la funcion no existe todavia
+// en la base de datos (esquema sin aplicar), caso en el que si procede el fallback.
+function esFuncionInexistente(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const code = error.code || '';
+  const message = (error.message || '').toLowerCase();
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    message.includes('could not find the function') ||
+    message.includes('does not exist')
+  );
+}
+
+export interface ListarComprasResultado {
+  data: Compra[];
+  total: number;
 }
 
 export class CompraService {
@@ -36,6 +72,10 @@ export class CompraService {
         throw createCompraError(`El producto en la posición ${i + 1} no tiene descripción`);
       }
 
+      if (descripcion.length > MAX_DESCRIPCION) {
+        throw createCompraError(`La descripción del producto en la posición ${i + 1} supera los ${MAX_DESCRIPCION} caracteres`);
+      }
+
       if (isNaN(cantidad) || cantidad <= 0) {
         throw createCompraError(`La cantidad del producto "${descripcion}" debe ser mayor a 0`);
       }
@@ -58,7 +98,7 @@ export class CompraService {
       throw createCompraError('El total de la compra debe ser mayor a Q0.00');
     }
 
-    // 1. Intentar registrar a traves de la funcion transaccional RPC de PostgreSQL
+    // 1. Registrar a traves de la funcion transaccional RPC de PostgreSQL
     const { data: rpcData, error: rpcError } = await supabase.rpc('registrar_compra_transaccional', {
       p_user_id: userId,
       p_cliente_id: clienteId,
@@ -70,8 +110,16 @@ export class CompraService {
       return this.obtenerCompraPorId(userId, rpcData.compra_id);
     }
 
-    // 2. Si la RPC no existe en la base todavia o genera error especifico, usar fallback seguro
-    // Validar cliente
+    // Si la RPC existe pero rechazo la operacion por una regla de negocio,
+    // se propaga el mensaje original (no se debe enmascarar el error).
+    if (rpcError && !esFuncionInexistente(rpcError)) {
+      throw createCompraError(rpcError.message || 'No se pudo registrar la compra', 400);
+    }
+
+    // 2. Fallback solo cuando la funcion RPC no existe en la base todavia.
+    // Se valida de nuevo y se compensan los pasos ante cualquier fallo.
+    console.warn('[COMPRA] RPC registrar_compra_transaccional no disponible; usando fallback en Node.js.');
+
     const { data: cliente, error: errCliente } = await supabase
       .from('clientes')
       .select('id, nombre, apellido, saldo_pendiente, activo')
@@ -90,7 +138,6 @@ export class CompraService {
     const saldoAnterior = Number(cliente.saldo_pendiente) || 0;
     const nuevoSaldo = Math.round((saldoAnterior + totalCalculado) * 100) / 100;
 
-    // Insertar compra
     const { data: nuevaCompra, error: errCompra } = await supabase
       .from('compras')
       .insert({
@@ -108,7 +155,6 @@ export class CompraService {
       throw createCompraError('Error al registrar la compra: ' + (errCompra?.message || 'Error desconocido'), 500);
     }
 
-    // Insertar detalles
     const detallesParaInsertar = itemsSaneados.map((it) => ({
       compra_id: nuevaCompra.id,
       descripcion_producto: it.descripcion,
@@ -122,20 +168,27 @@ export class CompraService {
       .insert(detallesParaInsertar);
 
     if (errDetalles) {
+      // Compensacion: si fallan los detalles, se elimina la cabecera recien creada.
+      await supabase.from('compras').delete().eq('id', nuevaCompra.id).eq('user_id', userId);
       throw createCompraError('Error al registrar detalles de la compra: ' + errDetalles.message, 500);
     }
 
-    // Actualizar saldo del cliente
-    await supabase
+    const { error: errSaldo } = await supabase
       .from('clientes')
       .update({
         saldo_pendiente: nuevoSaldo,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', clienteId);
+      .eq('id', clienteId)
+      .eq('user_id', userId);
 
-    // Registrar en movimientos_financieros
-    await supabase
+    if (errSaldo) {
+      await supabase.from('detalles_compra').delete().eq('compra_id', nuevaCompra.id);
+      await supabase.from('compras').delete().eq('id', nuevaCompra.id).eq('user_id', userId);
+      throw createCompraError('Error al actualizar el saldo del cliente: ' + errSaldo.message, 500);
+    }
+
+    const { error: errMov } = await supabase
       .from('movimientos_financieros')
       .insert({
         cliente_id: clienteId,
@@ -149,38 +202,47 @@ export class CompraService {
         fecha,
       });
 
+    if (errMov) {
+      // La compra ya se aplico; se registra el incidente pero no se revierte
+      // el saldo para no descuadrar la contabilidad. Se informa el error.
+      console.error('[COMPRA] No se pudo registrar el movimiento financiero:', errMov.message);
+    }
+
     return this.obtenerCompraPorId(userId, nuevaCompra.id);
   }
 
-  static async listarCompras(userId: string, clienteId?: string, limit: number = 50): Promise<Compra[]> {
+  static async listarCompras(
+    userId: string,
+    clienteId?: string,
+    limit: number = 50,
+    paginacion?: Paginacion | null
+  ): Promise<ListarComprasResultado> {
     let query = supabase
       .from('compras')
-      .select('*, cliente:clientes(id, nombre, apellido), detalles:detalles_compra(*)')
+      .select('*, cliente:clientes(id, nombre, apellido), detalles:detalles_compra(*)', { count: 'exact' })
       .eq('user_id', userId)
-      .order('fecha_compra', { ascending: false })
-      .limit(limit);
+      .order('fecha_compra', { ascending: false });
 
     if (clienteId) {
       query = query.eq('cliente_id', clienteId);
     }
 
-    const { data: compras, error } = await query;
+    if (paginacion) {
+      query = query.range(paginacion.offset, paginacion.offset + paginacion.limit - 1);
+    } else {
+      query = query.limit(limit);
+    }
+
+    const { data: compras, error, count } = await query;
 
     if (error) {
       throw createCompraError('Error al listar compras: ' + error.message, 500);
     }
 
-    return (compras || []).map((c) => ({
-      ...c,
-      total: Number(c.total),
-      saldo_generado: Number(c.saldo_generado),
-      detalles: (c.detalles || []).map((d: DetalleCompra) => ({
-        ...d,
-        cantidad: Number(d.cantidad),
-        precio_unitario: Number(d.precio_unitario),
-        subtotal: Number(d.subtotal),
-      })),
-    }));
+    return {
+      data: (compras || []).map(normalizarCompra),
+      total: count ?? (compras || []).length,
+    };
   }
 
   static async obtenerCompraPorId(userId: string, compraId: string): Promise<Compra> {
@@ -195,16 +257,6 @@ export class CompraService {
       throw createCompraError('Compra no encontrada', 404);
     }
 
-    return {
-      ...compra,
-      total: Number(compra.total),
-      saldo_generado: Number(compra.saldo_generado),
-      detalles: (compra.detalles || []).map((d: DetalleCompra) => ({
-        ...d,
-        cantidad: Number(d.cantidad),
-        precio_unitario: Number(d.precio_unitario),
-        subtotal: Number(d.subtotal),
-      })),
-    };
+    return normalizarCompra(compra);
   }
 }

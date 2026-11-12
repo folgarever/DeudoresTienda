@@ -2,8 +2,19 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase';
 import { env } from '../config/env';
-import { RegistroDTO, LoginDTO, AuthResponse, UsuarioPublico, TokenPayload } from '../types/auth';
+import {
+  RegistroDTO,
+  LoginDTO,
+  AuthResponse,
+  UsuarioPublico,
+  TokenPayload,
+  CambiarPasswordDTO,
+} from '../types/auth';
+import { sanitizeFilterValue } from '../utils/sanitize';
 import { AppError } from '../middlewares/errorHandler';
+
+const MAX_NOMBRE = 100;
+const MAX_APELLIDO = 100;
 
 function createAuthError(message: string, statusCode: number = 400): AppError {
   const err = new Error(message) as AppError;
@@ -29,9 +40,17 @@ export class AuthService {
       throw createAuthError('Todos los campos son obligatorios (nombres, apellidos, correo, usuario y contraseña)');
     }
 
+    if (nombres.length > MAX_NOMBRE || apellidos.length > MAX_APELLIDO) {
+      throw createAuthError(`Los nombres y apellidos no pueden superar los ${MAX_NOMBRE} caracteres`);
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       throw createAuthError('El correo electrónico no tiene un formato válido');
+    }
+
+    if (!/^[a-z0-9._-]+$/.test(username)) {
+      throw createAuthError('El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos');
     }
 
     if (username.length < 3 || username.length > 30) {
@@ -125,11 +144,13 @@ export class AuthService {
       throw createAuthError('Debe ingresar su usuario o correo y su contraseña');
     }
 
-    // Buscar por username o por email
+    // Se sanea el valor para evitar manipular el filtro OR de PostgREST.
+    const valorSaneado = sanitizeFilterValue(usernameOrEmail);
+
     const { data: usuario, error } = await supabase
       .from('usuarios')
       .select('*')
-      .or(`username.ilike.${usernameOrEmail},email.ilike.${usernameOrEmail}`)
+      .or(`username.ilike.${valorSaneado},email.ilike.${valorSaneado}`)
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
@@ -185,5 +206,78 @@ export class AuthService {
     }
 
     return usuario as UsuarioPublico;
+  }
+
+  static async actualizarPerfil(
+    userId: string,
+    dto: { nombres?: string; apellidos?: string }
+  ): Promise<UsuarioPublico> {
+    const nombres = dto.nombres?.trim();
+    const apellidos = dto.apellidos?.trim();
+
+    if (!nombres || !apellidos) {
+      throw createAuthError('El nombre y el apellido son obligatorios');
+    }
+
+    if (nombres.length > MAX_NOMBRE || apellidos.length > MAX_APELLIDO) {
+      throw createAuthError(`Los nombres y apellidos no pueden superar los ${MAX_NOMBRE} caracteres`);
+    }
+
+    const { data: usuario, error } = await supabase
+      .from('usuarios')
+      .update({ nombres, apellidos, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .select('id, nombres, apellidos, email, username, activo, created_at')
+      .single();
+
+    if (error || !usuario) {
+      throw createAuthError('Error al actualizar el perfil: ' + (error?.message || 'Error desconocido'), 500);
+    }
+
+    return usuario as UsuarioPublico;
+  }
+
+  static async cambiarPassword(userId: string, dto: CambiarPasswordDTO): Promise<void> {
+    const passwordActual = dto.passwordActual;
+    const passwordNueva = dto.passwordNueva;
+
+    if (!passwordActual || !passwordNueva) {
+      throw createAuthError('Debe ingresar su contraseña actual y la nueva contraseña');
+    }
+
+    if (passwordNueva.length < 6) {
+      throw createAuthError('La nueva contraseña debe tener al menos 6 caracteres');
+    }
+
+    if (passwordNueva === passwordActual) {
+      throw createAuthError('La nueva contraseña debe ser diferente a la actual');
+    }
+
+    const { data: usuario, error } = await supabase
+      .from('usuarios')
+      .select('id, password_hash')
+      .eq('id', userId)
+      .single();
+
+    if (error || !usuario) {
+      throw createAuthError('Usuario no encontrado', 404);
+    }
+
+    const passwordValida = await bcrypt.compare(passwordActual, usuario.password_hash);
+    if (!passwordValida) {
+      throw createAuthError('La contraseña actual es incorrecta', 401);
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(passwordNueva, salt);
+
+    const { error: errorUpdate } = await supabase
+      .from('usuarios')
+      .update({ password_hash, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+
+    if (errorUpdate) {
+      throw createAuthError('Error al actualizar la contraseña: ' + errorUpdate.message, 500);
+    }
   }
 }

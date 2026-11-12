@@ -56,6 +56,12 @@ import { DashboardStats } from '../../models';
           </div>
 
           <div class="card-uber stat-card">
+            <span class="stat-label">Total Vendido</span>
+            <span class="stat-value font-mono">Q{{ data.total_dinero_vendido | number:'1.2-2' }}</span>
+            <span class="stat-meta">Monto total facturado</span>
+          </div>
+
+          <div class="card-uber stat-card">
             <span class="stat-label">Total Abonado</span>
             <span class="stat-value font-mono">Q{{ data.total_dinero_abonado | number:'1.2-2' }}</span>
             <span class="stat-meta">Dinero recuperado</span>

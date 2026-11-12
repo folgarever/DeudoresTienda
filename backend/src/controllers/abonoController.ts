@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AbonoService } from '../services/abonoService';
+import { parsePaginacion } from '../utils/pagination';
 
 export class AbonoController {
   static async registrar(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -28,17 +29,21 @@ export class AbonoController {
     try {
       const userId = req.user!.id;
       const { cliente_id, limit } = req.query;
+      const paginacion = parsePaginacion(req, 50, 200);
 
-      const abonos = await AbonoService.listarAbonos(
+      const resultado = await AbonoService.listarAbonos(
         userId,
         cliente_id ? String(cliente_id) : undefined,
-        limit ? parseInt(String(limit), 10) : 50
+        limit ? parseInt(String(limit), 10) : 50,
+        paginacion
       );
 
       res.status(200).json({
         success: true,
-        total: abonos.length,
-        data: abonos,
+        total: resultado.total,
+        page: paginacion?.page ?? 1,
+        limit: paginacion?.limit ?? resultado.data.length,
+        data: resultado.data,
       });
     } catch (err) {
       next(err);

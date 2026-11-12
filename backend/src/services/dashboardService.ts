@@ -48,15 +48,22 @@ export class DashboardService {
       .sort((a, b) => b.saldo_pendiente - a.saldo_pendiente)
       .slice(0, 10);
 
-    // 2. Total de compras registradas
-    const { count: totalCompras, error: errCountCompras } = await supabase
+    // 2. Total de compras registradas y monto total vendido
+    const { data: comprasTotales, error: errCompras } = await supabase
       .from('compras')
-      .select('*', { count: 'exact', head: true })
+      .select('total')
       .eq('user_id', userId);
 
-    if (errCountCompras) {
-      throw createDashboardError('Error al contar compras: ' + errCountCompras.message, 500);
+    if (errCompras) {
+      throw createDashboardError('Error al consultar compras: ' + errCompras.message, 500);
     }
+
+    const totalCompras = (comprasTotales || []).length;
+    let totalDineroVendido = 0;
+    for (const c of comprasTotales || []) {
+      totalDineroVendido += Number(c.total) || 0;
+    }
+    totalDineroVendido = Math.round(totalDineroVendido * 100) / 100;
 
     // 3. Total de dinero abonado
     const { data: abonos, error: errAbonos } = await supabase
@@ -75,16 +82,17 @@ export class DashboardService {
     totalDineroAbonado = Math.round(totalDineroAbonado * 100) / 100;
 
     // 4. Compras recientes (ultimas 5)
-    const comprasRecientes = await CompraService.listarCompras(userId, undefined, 5);
+    const comprasRecientes = (await CompraService.listarCompras(userId, undefined, 5)).data;
 
     // 5. Ultimos abonos registrados (ultimos 5)
-    const ultimosAbonos = await AbonoService.listarAbonos(userId, undefined, 5);
+    const ultimosAbonos = (await AbonoService.listarAbonos(userId, undefined, 5)).data;
 
     return {
       total_clientes: totalClientes,
       clientes_con_deuda: clientesConDeuda,
       total_dinero_por_cobrar: totalDineroPorCobrar,
-      total_compras_registradas: totalCompras || 0,
+      total_compras_registradas: totalCompras,
+      total_dinero_vendido: totalDineroVendido,
       total_dinero_abonado: totalDineroAbonado,
       compras_recientes: comprasRecientes,
       ultimos_abonos: ultimosAbonos,

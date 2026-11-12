@@ -59,6 +59,35 @@ export class AuthController {
     }
   }
 
+  static async actualizarPerfil(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { nombres, apellidos } = req.body;
+      const usuario = await AuthService.actualizarPerfil(req.user!.id, { nombres, apellidos });
+
+      res.status(200).json({
+        success: true,
+        message: 'Perfil actualizado exitosamente',
+        data: usuario,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async cambiarPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { passwordActual, passwordNueva } = req.body;
+      await AuthService.cambiarPassword(req.user!.id, { passwordActual, passwordNueva });
+
+      res.status(200).json({
+        success: true,
+        message: 'Contraseña actualizada exitosamente',
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async logout(_req: Request, res: Response): Promise<void> {
     res.status(200).json({
       success: true,

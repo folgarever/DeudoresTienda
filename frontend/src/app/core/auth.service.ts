@@ -59,6 +59,24 @@ export class AuthService {
     );
   }
 
+  obtenerPerfil(): Observable<{ success: boolean; data: Usuario }> {
+    return this.http.get<{ success: boolean; data: Usuario }>(`${this.apiUrl}/profile`);
+  }
+
+  actualizarPerfil(data: { nombres: string; apellidos: string }): Observable<{ success: boolean; data: Usuario; message?: string }> {
+    return this.http.put<{ success: boolean; data: Usuario; message?: string }>(`${this.apiUrl}/profile`, data).pipe(
+      tap((res) => {
+        if (res.success && res.data) {
+          this.updateStoredUser(res.data);
+        }
+      })
+    );
+  }
+
+  cambiarPassword(data: { passwordActual: string; passwordNueva: string }): Observable<{ success: boolean; message?: string }> {
+    return this.http.put<{ success: boolean; message?: string }>(`${this.apiUrl}/password`, data);
+  }
+
   private setSession(token: string, usuario: Usuario): void {
     try {
       localStorage.setItem(this.tokenKey, token);
@@ -68,6 +86,15 @@ export class AuthService {
     }
     this.currentUser.set(usuario);
     this.isAuthenticated.set(true);
+  }
+
+  private updateStoredUser(usuario: Usuario): void {
+    try {
+      localStorage.setItem(this.userKey, JSON.stringify(usuario));
+    } catch (e) {
+      console.error('Error al actualizar usuario:', e);
+    }
+    this.currentUser.set(usuario);
   }
 
   logout(): void {

@@ -282,12 +282,14 @@ export class NuevoAbonoComponent implements OnInit {
       return;
     }
 
-    if (this.montoAbono <= 0) {
+    const monto = Number(this.montoAbono) || 0;
+
+    if (monto <= 0) {
       this.errorMensaje.set('El monto del abono debe ser mayor a Q0.00');
       return;
     }
 
-    if (this.montoAbono > cl.saldo_pendiente) {
+    if (monto > cl.saldo_pendiente) {
       this.errorMensaje.set('El monto del abono no puede superar la deuda pendiente');
       return;
     }
@@ -297,7 +299,7 @@ export class NuevoAbonoComponent implements OnInit {
 
     this.abonoService.registrar({
       cliente_id: cl.id,
-      monto: this.montoAbono,
+      monto,
       observaciones: this.observaciones.trim() || undefined
     }).subscribe({
       next: () => {

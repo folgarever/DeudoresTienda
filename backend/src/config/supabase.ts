@@ -12,10 +12,15 @@ export function getSupabase(): SupabaseClient {
   const key = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
 
   if (!url || !key) {
-    console.warn(
-      '[AVISO] Las variables SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY no estan configuradas. ' +
-      'Configuralas en tu archivo .env o en el panel de Vercel.'
-    );
+    const mensaje =
+      '[CONFIG] Las variables SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY no estan configuradas. ' +
+      'Definalas en su archivo .env o en el panel de Vercel.';
+
+    if (env.isProduction) {
+      throw new Error(mensaje);
+    }
+
+    console.warn(mensaje);
   }
 
   supabaseClient = createClient(url || 'https://placeholder.supabase.co', key || 'placeholder-key', {

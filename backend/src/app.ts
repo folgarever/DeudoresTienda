@@ -1,5 +1,6 @@
 import express, { Application, Request, Response, Router } from 'express';
-import cors from 'cors';
+import cors, { CorsOptions } from 'cors';
+import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import authRoutes from './routes/authRoutes';
 import clienteRoutes from './routes/clienteRoutes';
@@ -11,15 +12,33 @@ import dashboardRoutes from './routes/dashboardRoutes';
 export function createApp(): Application {
   const app: Application = express();
 
-  // Middlewares globales
-  app.use(cors({
-    origin: '*',
+  // Detras de un proxy (Vercel) se confia en el primer salto para que req.ip
+  // refleje la IP real del cliente. Sin esto, el limitador de intentos
+  // agruparia a todos los usuarios bajo la misma IP del proxy.
+  app.set('trust proxy', 1);
+
+  // Politica de CORS: si se definen origenes permitidos se aplican;
+  // de lo contrario se permite cualquiera (util para desarrollo local).
+  const corsOptions: CorsOptions = {
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      if (env.CORS_ORIGINS.length === 0 || env.CORS_ORIGINS.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
+  };
 
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(cors(corsOptions));
+
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
   // Router de API
   const apiRouter = Router();
