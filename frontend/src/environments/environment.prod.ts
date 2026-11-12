@@ -14,7 +14,7 @@ function getApiUrl(): string {
       if (stored) return stored;
     } catch {}
   }
-  return '/api';
+  return 'https://deudores-tienda.vercel.app/api';
 }
 
 export const environment = {
