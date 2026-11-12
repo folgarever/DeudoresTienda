@@ -2,6 +2,7 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import authRoutes from './routes/authRoutes';
+import clienteRoutes from './routes/clienteRoutes';
 
 export function createApp(): Application {
   const app: Application = express();
@@ -28,6 +29,7 @@ export function createApp(): Application {
 
   // Rutas de modulos
   app.use('/api/auth', authRoutes);
+  app.use('/api/clientes', clienteRoutes);
 
   // Manejo de rutas no encontradas y errores globales
   app.use(notFoundHandler);
