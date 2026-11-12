@@ -12,6 +12,11 @@ import dashboardRoutes from './routes/dashboardRoutes';
 export function createApp(): Application {
   const app: Application = express();
 
+  // Detras de un proxy (Vercel) se confia en el primer salto para que req.ip
+  // refleje la IP real del cliente. Sin esto, el limitador de intentos
+  // agruparia a todos los usuarios bajo la misma IP del proxy.
+  app.set('trust proxy', 1);
+
   // Politica de CORS: si se definen origenes permitidos se aplican;
   // de lo contrario se permite cualquiera (util para desarrollo local).
   const corsOptions: CorsOptions = {
