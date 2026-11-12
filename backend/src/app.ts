@@ -1,6 +1,7 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
+import authRoutes from './routes/authRoutes';
 
 export function createApp(): Application {
   const app: Application = express();
@@ -24,6 +25,9 @@ export function createApp(): Application {
       timestamp: new Date().toISOString(),
     });
   });
+
+  // Rutas de modulos
+  app.use('/api/auth', authRoutes);
 
   // Manejo de rutas no encontradas y errores globales
   app.use(notFoundHandler);
