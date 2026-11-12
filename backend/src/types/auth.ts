@@ -33,6 +33,11 @@ export interface LoginDTO {
   password: string;
 }
 
+export interface CambiarPasswordDTO {
+  passwordActual: string;
+  passwordNueva: string;
+}
+
 export interface AuthResponse {
   token: string;
   usuario: UsuarioPublico;

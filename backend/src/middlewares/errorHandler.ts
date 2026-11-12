@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { env } from '../config/env';
 
 export interface AppError extends Error {
   statusCode?: number;
@@ -19,7 +20,13 @@ export function errorHandler(
   _next: NextFunction
 ): void {
   const statusCode = err.statusCode && err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 500;
-  const message = err.message || 'Error interno del servidor';
+
+  // En produccion no se exponen los mensajes crudos de errores internos
+  // (pueden contener detalles del esquema de la base de datos).
+  const message =
+    statusCode === 500 && env.isProduction
+      ? 'Error interno del servidor'
+      : err.message || 'Error interno del servidor';
 
   if (statusCode === 500) {
     console.error('[ERROR_INTERNO]', err);
