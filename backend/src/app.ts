@@ -8,6 +8,8 @@ import compraRoutes from './routes/compraRoutes';
 import abonoRoutes from './routes/abonoRoutes';
 import historialRoutes from './routes/historialRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
+import reporteRoutes from './routes/reporteRoutes';
+import productoRoutes from './routes/productoRoutes';
 
 export function createApp(): Application {
   const app: Application = express();
@@ -60,6 +62,8 @@ export function createApp(): Application {
   apiRouter.use('/abonos', abonoRoutes);
   apiRouter.use('/historial', historialRoutes);
   apiRouter.use('/dashboard', dashboardRoutes);
+  apiRouter.use('/reportes', reporteRoutes);
+  apiRouter.use('/productos', productoRoutes);
 
   // Compatible tanto con prefijo /api como con rutas directas en Serverless
   app.use('/api', apiRouter);
