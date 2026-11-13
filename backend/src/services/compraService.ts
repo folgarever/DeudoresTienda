@@ -11,6 +11,17 @@ function createCompraError(message: string, statusCode: number = 400): AppError 
   return err;
 }
 
+// Convierte la fecha opcional enviada por el cliente a ISO (UTC).
+// Si el valor recibido no es una fecha valida se rechaza con un error 400.
+function parseFecha(valor?: string): string {
+  if (!valor) return new Date().toISOString();
+  const d = new Date(valor);
+  if (isNaN(d.getTime())) {
+    throw createCompraError('La fecha de la compra no es valida');
+  }
+  return d.toISOString();
+}
+
 function normalizarCompra(c: Record<string, unknown>): Compra {
   return {
     ...(c as unknown as Compra),
@@ -48,7 +59,7 @@ export class CompraService {
   static async registrarCompra(userId: string, dto: RegistrarCompraDTO): Promise<Compra> {
     const clienteId = dto.cliente_id?.trim();
     const items = dto.items;
-    const fecha = dto.fecha ? new Date(dto.fecha).toISOString() : new Date().toISOString();
+    const fecha = parseFecha(dto.fecha);
 
     if (!clienteId) {
       throw createCompraError('El cliente es obligatorio para registrar la compra');
