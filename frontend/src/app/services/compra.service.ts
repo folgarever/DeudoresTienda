@@ -15,14 +15,23 @@ export class CompraService {
     return this.http.post<{ success: boolean; data: Compra; message?: string }>(this.apiUrl, dto);
   }
 
-  listar(clienteId?: string, limit: number = 50): Observable<{ success: boolean; total: number; data: Compra[] }> {
+  listar(
+    clienteId?: string,
+    limit: number = 50,
+    incluirAnuladas: boolean = false
+  ): Observable<{ success: boolean; total: number; data: Compra[] }> {
     let params = new HttpParams().set('limit', limit.toString());
     if (clienteId) params = params.set('cliente_id', clienteId);
+    if (incluirAnuladas) params = params.set('incluirAnuladas', 'true');
 
     return this.http.get<{ success: boolean; total: number; data: Compra[] }>(this.apiUrl, { params });
   }
 
   obtenerPorId(id: string): Observable<{ success: boolean; data: Compra }> {
     return this.http.get<{ success: boolean; data: Compra }>(`${this.apiUrl}/${id}`);
+  }
+
+  anular(id: string, motivo?: string): Observable<{ success: boolean; data: Compra; message?: string }> {
+    return this.http.post<{ success: boolean; data: Compra; message?: string }>(`${this.apiUrl}/${id}/anular`, { motivo });
   }
 }

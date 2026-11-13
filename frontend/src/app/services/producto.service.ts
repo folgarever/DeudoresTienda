@@ -7,6 +7,8 @@ import { Producto } from '../models';
 export interface ProductoDTO {
   nombre: string;
   precio_unitario: number;
+  categoria?: string | null;
+  codigo?: string | null;
 }
 
 @Injectable({
@@ -16,12 +18,21 @@ export class ProductoService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/productos`;
 
-  listar(search?: string, incluirInactivos?: boolean): Observable<{ success: boolean; total: number; data: Producto[] }> {
+  listar(
+    search?: string,
+    incluirInactivos?: boolean,
+    categoria?: string
+  ): Observable<{ success: boolean; total: number; data: Producto[] }> {
     let params = new HttpParams();
     if (search) params = params.set('search', search);
     if (incluirInactivos) params = params.set('incluirInactivos', 'true');
+    if (categoria) params = params.set('categoria', categoria);
 
     return this.http.get<{ success: boolean; total: number; data: Producto[] }>(this.apiUrl, { params });
+  }
+
+  listarCategorias(): Observable<{ success: boolean; data: string[] }> {
+    return this.http.get<{ success: boolean; data: string[] }>(`${this.apiUrl}/categorias`);
   }
 
   crear(dto: ProductoDTO): Observable<{ success: boolean; data: Producto; message?: string }> {

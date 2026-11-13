@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ReporteService } from '../../services/reporte.service';
 import { ResumenCaja } from '../../models';
 import { fechaCorta, hoyInput, primerDiaMesInput } from '../../core/fecha.utils';
-import { descargarCSV, imprimir } from '../../core/exportar.utils';
+import { descargarPDF, imprimir } from '../../core/exportar.utils';
 
 @Component({
   selector: 'app-reportes',
@@ -30,8 +30,8 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
             <p class="text-muted">Resumen de ventas y dinero cobrado por periodo</p>
           </div>
           <div class="header-actions no-print">
-            <button type="button" class="btn-uber btn-uber-outline" (click)="exportarCSV()" [disabled]="!resumen()">
-              Exportar CSV
+            <button type="button" class="btn-uber btn-uber-outline" (click)="exportarPDF()" [disabled]="!resumen()">
+              Exportar PDF
             </button>
             <button type="button" class="btn-uber btn-uber-outline" (click)="imprimirReporte()" [disabled]="!resumen()">
               Imprimir
@@ -336,12 +336,12 @@ export class ReportesComponent implements OnInit {
     this.consultar();
   }
 
-  exportarCSV(): void {
+  exportarPDF(): void {
     const r = this.resumen();
     if (!r) return;
 
     const filas = r.dias.map((d) => [
-      d.fecha,
+      fechaCorta(d.fecha),
       d.cantidad_compras,
       d.total_ventas.toFixed(2),
       d.cantidad_abonos,
@@ -358,11 +358,16 @@ export class ReportesComponent implements OnInit {
       r.diferencia.toFixed(2),
     ]);
 
-    descargarCSV(
-      `cierre_caja_${this.desde()}_a_${this.hasta()}`,
-      ['Dia', 'No. compras', 'Ventas (Q)', 'No. abonos', 'Abonos (Q)', 'Diferencia (Q)'],
-      filas
-    );
+    descargarPDF({
+      titulo: 'Cierre de Caja',
+      subtitulo:
+        `Periodo: ${this.desde()} a ${this.hasta()} · ` +
+        `Ventas: Q${r.total_ventas.toFixed(2)} · Abonos: Q${r.total_abonos.toFixed(2)}`,
+      nombreArchivo: `cierre_caja_${this.desde()}_a_${this.hasta()}`,
+      encabezados: ['Día', 'N° compras', 'Ventas (Q)', 'N° abonos', 'Abonos (Q)', 'Diferencia (Q)'],
+      filas,
+      alineaciones: { 1: 'right', 2: 'right', 3: 'right', 4: 'right', 5: 'right' },
+    });
   }
 
   imprimirReporte(): void {

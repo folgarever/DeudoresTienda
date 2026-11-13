@@ -27,15 +27,26 @@ import { Producto } from '../../models';
           <input
             type="text"
             class="form-control"
-            placeholder="Buscar producto por nombre..."
+            placeholder="Buscar producto por nombre o código de barras..."
             [(ngModel)]="terminoBusqueda"
             (input)="onBuscar()"
           />
         </div>
-        <label class="checkbox-label">
-          <input type="checkbox" [(ngModel)]="incluirInactivos" (change)="onBuscar()" />
-          Mostrar productos inactivos
-        </label>
+        <div class="filters-extra">
+          <div class="categoria-box">
+            <label class="form-label" for="categoriaFiltro">Categoría</label>
+            <select id="categoriaFiltro" class="form-control" [(ngModel)]="categoriaFiltro" (change)="onBuscar()">
+              <option value="">Todas las categorías</option>
+              @for (cat of categorias(); track cat) {
+                <option [value]="cat">{{ cat }}</option>
+              }
+            </select>
+          </div>
+          <label class="checkbox-label">
+            <input type="checkbox" [(ngModel)]="incluirInactivos" (change)="onBuscar()" />
+            Mostrar productos inactivos
+          </label>
+        </div>
       </div>
 
       @if (mensajeExito()) {
@@ -62,6 +73,8 @@ import { Producto } from '../../models';
             <thead>
               <tr>
                 <th>Producto</th>
+                <th>Categoría</th>
+                <th>Código de barras</th>
                 <th>Estado</th>
                 <th class="text-right">Precio Unitario</th>
                 <th class="text-right">Acciones</th>
@@ -71,6 +84,14 @@ import { Producto } from '../../models';
               @for (p of productos(); track p.id) {
                 <tr [class.row-inactivo]="!p.activo">
                   <td class="font-bold">{{ p.nombre }}</td>
+                  <td class="text-muted">
+                    @if (p.categoria) {
+                      <span class="badge-uber badge-categoria">{{ p.categoria }}</span>
+                    } @else {
+                      —
+                    }
+                  </td>
+                  <td class="font-mono text-muted codigo-cell">{{ p.codigo || '—' }}</td>
                   <td>
                     @if (p.activo) {
                       <span class="badge-uber badge-saldado">Activo</span>
@@ -111,7 +132,7 @@ import { Producto } from '../../models';
               <button class="btn-close" (click)="cerrarModal()">✕</button>
             </div>
 
-            <p class="modal-hint">Guarda el nombre y el precio para reutilizarlo en las ventas.</p>
+            <p class="modal-hint">Guarda el nombre y el precio para reutilizarlo en las ventas. La categoría y el código son opcionales.</p>
 
             <form (ngSubmit)="guardarProducto()">
               <div class="form-group">
@@ -143,6 +164,38 @@ import { Producto } from '../../models';
                 />
               </div>
 
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label class="form-label" for="categoria">Categoría (opcional)</label>
+                  <input
+                    id="categoria"
+                    type="text"
+                    class="form-control"
+                    list="lista-categorias"
+                    [(ngModel)]="formCategoria"
+                    name="formCategoria"
+                    placeholder="Ej. Bebidas"
+                  />
+                  <datalist id="lista-categorias">
+                    @for (cat of categorias(); track cat) {
+                      <option [value]="cat"></option>
+                    }
+                  </datalist>
+                </div>
+
+                <div class="form-group flex-1">
+                  <label class="form-label" for="codigo">Código de barras (opcional)</label>
+                  <input
+                    id="codigo"
+                    type="text"
+                    class="form-control font-mono"
+                    [(ngModel)]="formCodigo"
+                    name="formCodigo"
+                    placeholder="Ej. 7501055300844"
+                  />
+                </div>
+              </div>
+
               <div class="modal-actions">
                 <button type="button" class="btn-uber btn-uber-outline" (click)="cerrarModal()">Cancelar</button>
                 <button type="submit" class="btn-uber" [disabled]="guardando()">
@@ -160,13 +213,25 @@ import { Producto } from '../../models';
     .filters-card {
       display: flex;
       flex-wrap: wrap;
-      align-items: center;
+      align-items: flex-end;
       justify-content: space-between;
       gap: 16px;
       margin-bottom: 24px;
       padding: 16px;
     }
     .search-box { flex: 1; min-width: 260px; }
+    .filters-extra {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 18px;
+    }
+    .categoria-box {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 180px;
+    }
     .checkbox-label {
       display: flex;
       align-items: center;
@@ -175,6 +240,12 @@ import { Producto } from '../../models';
       cursor: pointer;
       user-select: none;
     }
+    .badge-categoria {
+      background-color: var(--color-gray-light);
+      color: var(--color-gray-dark);
+      border: 1px solid var(--color-gray-border);
+    }
+    .codigo-cell { font-size: 13px; }
     .row-inactivo { opacity: 0.6; }
     .action-buttons {
       display: inline-flex;
@@ -186,6 +257,9 @@ import { Producto } from '../../models';
     .mt-12 { margin-top: 12px; }
     .loading-state { padding: 48px; text-align: center; color: var(--color-gray-secondary); }
 
+    .form-row { display: flex; gap: 12px; }
+    .flex-1 { flex: 1; }
+
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -196,7 +270,7 @@ import { Producto } from '../../models';
       z-index: 2000;
       padding: 16px;
     }
-    .modal-card { width: 100%; max-width: 440px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); }
+    .modal-card { width: 100%; max-width: 520px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); }
     .modal-header {
       display: flex;
       align-items: center;
@@ -207,12 +281,17 @@ import { Producto } from '../../models';
     .btn-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--color-gray-dark); }
     .modal-hint { font-size: 13px; margin-bottom: 20px; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+
+    @media (max-width: 560px) {
+      .form-row { flex-direction: column; gap: 0; }
+    }
   `]
 })
 export class ProductosComponent implements OnInit {
   private productoService = inject(ProductoService);
 
   productos = signal<Producto[]>([]);
+  categorias = signal<string[]>([]);
   cargando = signal<boolean>(true);
   guardando = signal<boolean>(false);
   mensajeExito = signal<string | null>(null);
@@ -220,23 +299,34 @@ export class ProductosComponent implements OnInit {
 
   terminoBusqueda = '';
   incluirInactivos = false;
+  categoriaFiltro = '';
 
   mostrarModal = signal<boolean>(false);
   productoEnEdicion = signal<Producto | null>(null);
   formNombre = '';
   formPrecio = 0;
+  formCategoria = '';
+  formCodigo = '';
 
   private temporizadorExito?: ReturnType<typeof setTimeout>;
 
   ngOnInit(): void {
+    this.cargarCategorias();
     this.cargarProductos();
+  }
+
+  cargarCategorias(): void {
+    this.productoService.listarCategorias().subscribe({
+      next: (res) => this.categorias.set(res.data || []),
+      error: () => this.categorias.set([])
+    });
   }
 
   cargarProductos(): void {
     this.cargando.set(true);
     this.errorMensaje.set(null);
 
-    this.productoService.listar(this.terminoBusqueda, this.incluirInactivos).subscribe({
+    this.productoService.listar(this.terminoBusqueda, this.incluirInactivos, this.categoriaFiltro).subscribe({
       next: (res) => {
         this.cargando.set(false);
         this.productos.set(res.data || []);
@@ -262,6 +352,8 @@ export class ProductosComponent implements OnInit {
     this.productoEnEdicion.set(null);
     this.formNombre = '';
     this.formPrecio = 0;
+    this.formCategoria = '';
+    this.formCodigo = '';
     this.mostrarModal.set(true);
   }
 
@@ -269,6 +361,8 @@ export class ProductosComponent implements OnInit {
     this.productoEnEdicion.set(producto);
     this.formNombre = producto.nombre;
     this.formPrecio = producto.precio_unitario;
+    this.formCategoria = producto.categoria || '';
+    this.formCodigo = producto.codigo || '';
     this.mostrarModal.set(true);
   }
 
@@ -292,7 +386,9 @@ export class ProductosComponent implements OnInit {
 
     const dto = {
       nombre: this.formNombre.trim(),
-      precio_unitario: Number(this.formPrecio) || 0
+      precio_unitario: Number(this.formPrecio) || 0,
+      categoria: this.formCategoria.trim() || null,
+      codigo: this.formCodigo.trim() || null
     };
 
     const edicion = this.productoEnEdicion();
@@ -305,6 +401,7 @@ export class ProductosComponent implements OnInit {
         this.guardando.set(false);
         this.cerrarModal();
         this.mostrarExito(edicion ? 'Producto actualizado exitosamente' : 'Producto registrado exitosamente');
+        this.cargarCategorias();
         this.cargarProductos();
       },
       error: (err) => {
@@ -321,6 +418,7 @@ export class ProductosComponent implements OnInit {
     this.productoService.desactivar(producto.id).subscribe({
       next: () => {
         this.mostrarExito('Producto desactivado.');
+        this.cargarCategorias();
         this.cargarProductos();
       },
       error: (err) => {
@@ -333,6 +431,7 @@ export class ProductosComponent implements OnInit {
     this.productoService.reactivar(producto.id).subscribe({
       next: () => {
         this.mostrarExito('Producto reactivado exitosamente.');
+        this.cargarCategorias();
         this.cargarProductos();
       },
       error: (err) => {

@@ -1,29 +1,101 @@
-// Utilidades para exportar datos a CSV e imprimir reportes.
+// Utilidades para exportar datos a PDF e imprimir reportes.
 
-export type FilaCSV = (string | number | null | undefined)[];
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-// Escapa un valor para CSV: comillas dobles internas y separadores.
-function escapar(valor: string | number | null | undefined): string {
-  const s = valor === null || valor === undefined ? '' : String(valor);
-  if (/[";\n\r]/.test(s)) {
-    return '"' + s.replace(/"/g, '""') + '"';
-  }
-  return s;
+export type FilaPDF = (string | number | null | undefined)[];
+
+export interface OpcionesPDF {
+  titulo: string;
+  subtitulo?: string;
+  nombreArchivo: string;
+  encabezados: string[];
+  filas: FilaPDF[];
+  // Alineacion por indice de columna (por defecto a la izquierda).
+  alineaciones?: Record<number, 'left' | 'right' | 'center'>;
 }
 
-// Descarga un archivo CSV compatible con Excel en espanol (delimitador ";" y BOM UTF-8).
-export function descargarCSV(nombreArchivo: string, encabezados: string[], filas: FilaCSV[]): void {
-  const lineas = [encabezados, ...filas].map((fila) => fila.map(escapar).join(';'));
-  const contenido = '\uFEFF' + lineas.join('\r\n');
-  const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = nombreArchivo.toLowerCase().endsWith('.csv') ? nombreArchivo : `${nombreArchivo}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+function normalizar(valor: FilaPDF[number]): string {
+  return valor === null || valor === undefined ? '' : String(valor);
+}
+
+// Genera y descarga un PDF con una tabla a partir de los datos indicados.
+// Mantiene la identidad monocromatica: encabezado negro y filas alternadas.
+export function descargarPDF(opciones: OpcionesPDF): void {
+  const { titulo, subtitulo, nombreArchivo, encabezados, filas, alineaciones } = opciones;
+
+  const doc = new jsPDF({
+    orientation: encabezados.length > 5 ? 'landscape' : 'portrait',
+    unit: 'pt',
+    format: 'a4',
+  });
+
+  const margen = 40;
+  const anchoPagina = doc.internal.pageSize.getWidth();
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(0);
+  doc.text(titulo, margen, 48);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(90);
+  let cursorY = 66;
+  if (subtitulo) {
+    doc.text(subtitulo, margen, cursorY);
+    cursorY += 15;
+  }
+  doc.text(`Emitido: ${new Date().toLocaleString('es-GT')}`, margen, cursorY);
+
+  const columnStyles: Record<number, { halign: 'left' | 'right' | 'center' }> = {};
+  if (alineaciones) {
+    for (const clave of Object.keys(alineaciones)) {
+      const idx = Number(clave);
+      columnStyles[idx] = { halign: alineaciones[idx] };
+    }
+  }
+
+  autoTable(doc, {
+    head: [encabezados],
+    body: filas.map((fila) => fila.map(normalizar)),
+    startY: cursorY + 16,
+    margin: { left: margen, right: margen },
+    styles: {
+      font: 'helvetica',
+      fontSize: 9,
+      cellPadding: 5,
+      textColor: 20,
+      lineColor: [225, 225, 225],
+      lineWidth: 0.5,
+      overflow: 'linebreak',
+    },
+    headStyles: {
+      fillColor: [0, 0, 0],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 9,
+    },
+    alternateRowStyles: { fillColor: [250, 250, 250] },
+    columnStyles,
+  });
+
+  // Pie de pagina con numeracion en todas las hojas.
+  const totalPaginas = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPaginas; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(130);
+    doc.text(
+      `DeudoresTienda · Pagina ${i} de ${totalPaginas}`,
+      margen,
+      doc.internal.pageSize.getHeight() - 20
+    );
+  }
+
+  const nombre = nombreArchivo.toLowerCase().endsWith('.pdf') ? nombreArchivo : `${nombreArchivo}.pdf`;
+  doc.save(nombre);
 }
 
 // Abre el dialogo de impresion del navegador (usado para estados de cuenta y reportes).
