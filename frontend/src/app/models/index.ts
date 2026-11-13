@@ -20,9 +20,13 @@ export interface Cliente {
   apellido: string;
   saldo_pendiente: number;
   activo: boolean;
+  ultimo_abono?: string | null;
+  dias_sin_abonar?: number | null;
   created_at?: string;
   updated_at?: string;
 }
+
+export type OrdenClientes = 'nombre' | 'saldo' | 'reciente';
 
 export interface ItemCompraDTO {
   descripcion: string;
@@ -52,6 +56,9 @@ export interface Compra {
   total: number;
   estado_pago: 'PENDIENTE' | 'PARCIAL' | 'PAGADO';
   saldo_generado: number;
+  anulada?: boolean;
+  anulada_at?: string | null;
+  motivo_anulacion?: string | null;
   fecha_compra: string;
   created_at?: string;
   cliente?: {
@@ -78,6 +85,9 @@ export interface AbonoPago {
   saldo_anterior: number;
   saldo_restante: number;
   observaciones?: string;
+  anulado?: boolean;
+  anulado_at?: string | null;
+  motivo_anulacion?: string | null;
   fecha_pago: string;
   created_at?: string;
   cliente?: {
@@ -91,7 +101,7 @@ export interface MovimientoFinanciero {
   id: string;
   cliente_id: string;
   user_id: string;
-  tipo: 'COMPRA' | 'ABONO';
+  tipo: 'COMPRA' | 'ABONO' | 'ANULACION_COMPRA' | 'ANULACION_ABONO';
   referencia_id: string;
   descripcion: string;
   monto: number;
@@ -148,6 +158,8 @@ export interface Producto {
   user_id: string;
   nombre: string;
   precio_unitario: number;
+  categoria?: string | null;
+  codigo?: string | null;
   activo: boolean;
   created_at?: string;
   updated_at?: string;

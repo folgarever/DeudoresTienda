@@ -4,9 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HistorialService } from '../../services/historial.service';
 import { CompraService } from '../../services/compra.service';
-import { Compra, ResumenHistorialCliente } from '../../models';
+import { AbonoService } from '../../services/abono.service';
+import { AbonoPago, Compra, MovimientoFinanciero, ResumenHistorialCliente } from '../../models';
 import { dentroDeRango, fechaCorta, hoyInput, primerDiaMesInput } from '../../core/fecha.utils';
-import { descargarCSV, imprimir } from '../../core/exportar.utils';
+import { descargarPDF, imprimir } from '../../core/exportar.utils';
 
 @Component({
   selector: 'app-historial',
@@ -44,7 +45,7 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
                 </a>
               }
               <button type="button" class="btn-uber btn-uber-outline" (click)="exportarMovimientos()">
-                Exportar CSV
+                Exportar PDF
               </button>
               <button type="button" class="btn-uber btn-uber-outline" (click)="imprimirEstadoCuenta()">
                 Imprimir estado de cuenta
@@ -53,6 +54,13 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
           </div>
         }
       </div>
+
+      @if (mensajeExito()) {
+        <div class="alert-uber no-print">{{ mensajeExito() }}</div>
+      }
+      @if (avisoError()) {
+        <div class="alert-uber alert-uber-error no-print">{{ avisoError() }}</div>
+      }
 
       @if (cargando()) {
         <div class="loading-state">
@@ -142,7 +150,7 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
           } @else {
             <div class="compras-list">
               @for (c of comprasFiltradas(); track c.id) {
-                <div class="card-uber compra-card">
+                <div class="card-uber compra-card" [class.compra-anulada]="c.anulada">
                   <div class="compra-head">
                     <div>
                       <div class="compra-fecha">
@@ -151,18 +159,30 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
                       </div>
                       <div class="compra-meta text-muted">
                         {{ (c.detalles?.length || 0) }} producto(s) anotado(s)
+                        @if (c.anulada && c.motivo_anulacion) {
+                          · Motivo: {{ c.motivo_anulacion }}
+                        }
                       </div>
                     </div>
                     <div class="compra-right">
-                      <span
-                        class="badge-uber"
-                        [class.badge-saldado]="c.estado_pago === 'PAGADO'"
-                        [class.badge-parcial]="c.estado_pago === 'PARCIAL'"
-                        [class.badge-deuda]="c.estado_pago === 'PENDIENTE'"
-                      >
-                        {{ c.estado_pago === 'PAGADO' ? 'Pagado' : (c.estado_pago === 'PARCIAL' ? 'Parcial' : 'Pendiente') }}
-                      </span>
-                      <span class="compra-total font-mono">Q{{ c.total | number:'1.2-2' }}</span>
+                      @if (c.anulada) {
+                        <span class="badge-uber badge-anulada">ANULADA</span>
+                      } @else {
+                        <span
+                          class="badge-uber"
+                          [class.badge-saldado]="c.estado_pago === 'PAGADO'"
+                          [class.badge-parcial]="c.estado_pago === 'PARCIAL'"
+                          [class.badge-deuda]="c.estado_pago === 'PENDIENTE'"
+                        >
+                          {{ c.estado_pago === 'PAGADO' ? 'Pagado' : (c.estado_pago === 'PARCIAL' ? 'Parcial' : 'Pendiente') }}
+                        </span>
+                      }
+                      <span class="compra-total font-mono" [class.tachado]="c.anulada">Q{{ c.total | number:'1.2-2' }}</span>
+                      @if (!c.anulada) {
+                        <button type="button" class="btn-uber btn-sm btn-uber-danger no-print" (click)="anularCompra(c)">
+                          Anular
+                        </button>
+                      }
                     </div>
                   </div>
 
@@ -206,7 +226,7 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
         <div class="section-container mt-32">
           <div class="section-header">
             <h2 class="section-title">Historial Cronológico de Movimientos</h2>
-            <p class="text-muted">Registro inmutable de compras anotadas y abonos efectuados</p>
+            <p class="text-muted">Registro de compras anotadas, abonos efectuados y sus anulaciones</p>
           </div>
 
           @if (movimientosFiltrados().length === 0) {
@@ -224,32 +244,48 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
                     <th class="text-right">Monto</th>
                     <th class="text-right">Saldo Anterior</th>
                     <th class="text-right">Saldo Resultante</th>
+                    <th class="text-right no-print">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (m of movimientosFiltrados(); track m.id) {
-                    <tr>
+                    <tr [class.row-anulada]="esAnulacion(m)">
                       <td class="font-mono text-muted" style="font-size: 13px;">
                         {{ m.fecha | date:'dd/MM/yyyy HH:mm' }}
                       </td>
                       <td>
                         @if (m.tipo === 'COMPRA') {
-                          <span class="badge-uber badge-deuda">COMPRA</span>
+                          <span class="badge-uber" [class.badge-deuda]="!estaAnulado(m)" [class.badge-anulada]="estaAnulado(m)">
+                            {{ estaAnulado(m) ? 'COMPRA ANULADA' : 'COMPRA' }}
+                          </span>
+                        } @else if (m.tipo === 'ABONO') {
+                          <span class="badge-uber" [class.badge-saldado]="!estaAnulado(m)" [class.badge-anulada]="estaAnulado(m)">
+                            {{ estaAnulado(m) ? 'ABONO ANULADO' : 'ABONO' }}
+                          </span>
                         } @else {
-                          <span class="badge-uber badge-saldado">ABONO</span>
+                          <span class="badge-uber badge-anulada">{{ etiquetaTipo(m) }}</span>
                         }
                       </td>
                       <td>
                         {{ m.descripcion }}
                       </td>
-                      <td class="text-right font-mono font-bold" [class.amount-buy]="m.tipo === 'COMPRA'" [class.amount-pay]="m.tipo === 'ABONO'">
-                        {{ m.tipo === 'COMPRA' ? '+Q' : '-Q' }}{{ m.monto | number:'1.2-2' }}
+                      <td class="text-right font-mono font-bold" [class.amount-buy]="signoMovimiento(m) === '+'" [class.amount-pay]="signoMovimiento(m) === '-'">
+                        {{ signoMovimiento(m) }}Q{{ m.monto | number:'1.2-2' }}
                       </td>
                       <td class="text-right font-mono text-muted">
                         Q{{ m.saldo_anterior | number:'1.2-2' }}
                       </td>
                       <td class="text-right font-mono font-bold">
                         Q{{ m.saldo_posterior | number:'1.2-2' }}
+                      </td>
+                      <td class="text-right no-print">
+                        @if (puedeAnular(m)) {
+                          <button type="button" class="btn-uber btn-sm btn-uber-danger" (click)="anularMovimiento(m)">
+                            Anular
+                          </button>
+                        } @else {
+                          <span class="text-muted">—</span>
+                        }
                       </td>
                     </tr>
                   }
@@ -266,6 +302,7 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
     .back-link { font-size: 13px; text-decoration: underline; color: var(--color-gray-dark); }
     .mt-4 { margin-top: 4px; }
     .mt-12 { margin-top: 12px; }
+    .mt-24 { margin-top: 24px; }
     .mt-32 { margin-top: 32px; }
 
     .client-header {
@@ -275,6 +312,7 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
     .client-actions {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .summary-grid {
@@ -346,6 +384,11 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
       padding: 18px 20px;
     }
 
+    .compra-card.compra-anulada {
+      opacity: 0.7;
+      border-style: dashed;
+    }
+
     .compra-head {
       display: flex;
       align-items: flex-start;
@@ -368,6 +411,7 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
     }
 
     .compra-total {
@@ -389,6 +433,21 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
 
     .amount-pay {
       color: #333333;
+    }
+
+    .badge-anulada {
+      background-color: var(--color-danger-bg);
+      color: var(--color-danger);
+      border: 1px solid var(--color-danger-border);
+    }
+
+    .tachado {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+
+    .row-anulada td {
+      opacity: 0.75;
     }
 
     .empty-card {
@@ -471,14 +530,20 @@ import { descargarCSV, imprimir } from '../../core/exportar.utils';
 export class HistorialComponent implements OnInit {
   private historialService = inject(HistorialService);
   private compraService = inject(CompraService);
+  private abonoService = inject(AbonoService);
   private route = inject(ActivatedRoute);
 
   historial = signal<ResumenHistorialCliente | null>(null);
   cargando = signal<boolean>(true);
   errorMensaje = signal<string | null>(null);
+  mensajeExito = signal<string | null>(null);
+  avisoError = signal<string | null>(null);
 
   compras = signal<Compra[]>([]);
   cargandoCompras = signal<boolean>(true);
+  abonos = signal<AbonoPago[]>([]);
+
+  private clienteId = '';
 
   desde = signal<string>('');
   hasta = signal<string>('');
@@ -496,12 +561,28 @@ export class HistorialComponent implements OnInit {
     this.compras().filter((c) => dentroDeRango(c.fecha_compra, this.desde(), this.hasta()))
   );
 
+  private comprasPorId = computed(() => {
+    const mapa = new Map<string, Compra>();
+    for (const c of this.compras()) mapa.set(c.id, c);
+    return mapa;
+  });
+
+  private abonosPorId = computed(() => {
+    const mapa = new Map<string, AbonoPago>();
+    for (const a of this.abonos()) mapa.set(a.id, a);
+    return mapa;
+  });
+
+  private temporizadorExito?: ReturnType<typeof setTimeout>;
+
   ngOnInit(): void {
     this.route.params.subscribe((params) => {
       const clienteId = params['id'];
       if (clienteId) {
+        this.clienteId = clienteId;
         this.cargarHistorial(clienteId);
         this.cargarCompras(clienteId);
+        this.cargarAbonos(clienteId);
       }
     });
   }
@@ -526,6 +607,107 @@ export class HistorialComponent implements OnInit {
     this.hasta.set(fmt(fin));
   }
 
+  // --- Estado de los movimientos (para badges y botones de anulación) ---
+
+  estaAnulado(m: MovimientoFinanciero): boolean {
+    if (m.tipo === 'COMPRA') return !!this.comprasPorId().get(m.referencia_id)?.anulada;
+    if (m.tipo === 'ABONO') return !!this.abonosPorId().get(m.referencia_id)?.anulado;
+    return false;
+  }
+
+  esAnulacion(m: MovimientoFinanciero): boolean {
+    return m.tipo === 'ANULACION_COMPRA' || m.tipo === 'ANULACION_ABONO';
+  }
+
+  puedeAnular(m: MovimientoFinanciero): boolean {
+    return (m.tipo === 'COMPRA' || m.tipo === 'ABONO') && !this.estaAnulado(m);
+  }
+
+  // Signo del monto respecto a la deuda: + incrementa, - reduce.
+  signoMovimiento(m: MovimientoFinanciero): string {
+    return m.tipo === 'COMPRA' || m.tipo === 'ANULACION_ABONO' ? '+' : '-';
+  }
+
+  etiquetaTipo(m: MovimientoFinanciero): string {
+    switch (m.tipo) {
+      case 'COMPRA':
+        return 'COMPRA';
+      case 'ABONO':
+        return 'ABONO';
+      case 'ANULACION_COMPRA':
+        return 'ANULACIÓN COMPRA';
+      case 'ANULACION_ABONO':
+        return 'ANULACIÓN ABONO';
+      default:
+        return String(m.tipo);
+    }
+  }
+
+  // --- Anulación de compras y abonos ---
+
+  anularCompra(c: Compra): void {
+    const motivo = prompt(
+      `¿Anular la compra del ${fechaCorta(c.fecha_compra)} por Q${c.total.toFixed(2)}?\n\n` +
+        'El monto se devolverá a la deuda del cliente. Puedes escribir un motivo (opcional):',
+      ''
+    );
+    if (motivo === null) return;
+
+    this.avisoError.set(null);
+    this.compraService.anular(c.id, motivo.trim() || undefined).subscribe({
+      next: () => {
+        this.mostrarExito('Compra anulada. El monto volvió a la deuda del cliente.');
+        this.recargarTodo();
+      },
+      error: (err) => this.avisoError.set(err.error?.message || 'Error al anular la compra')
+    });
+  }
+
+  anularMovimiento(m: MovimientoFinanciero): void {
+    if (m.tipo === 'COMPRA') {
+      const compra = this.comprasPorId().get(m.referencia_id);
+      if (compra) {
+        this.anularCompra(compra);
+        return;
+      }
+    }
+
+    if (m.tipo === 'ABONO') {
+      const abono = this.abonosPorId().get(m.referencia_id);
+      const etiqueta = abono ? `Q${abono.monto.toFixed(2)}` : 'este abono';
+      const motivo = prompt(
+        `¿Anular el abono de ${etiqueta}?\n\n` +
+          'El monto volverá a sumarse a la deuda del cliente. Puedes escribir un motivo (opcional):',
+        ''
+      );
+      if (motivo === null) return;
+
+      this.avisoError.set(null);
+      this.abonoService.anular(m.referencia_id, motivo.trim() || undefined).subscribe({
+        next: () => {
+          this.mostrarExito('Abono anulado. El monto volvió a la deuda del cliente.');
+          this.recargarTodo();
+        },
+        error: (err) => this.avisoError.set(err.error?.message || 'Error al anular el abono')
+      });
+    }
+  }
+
+  private recargarTodo(): void {
+    if (!this.clienteId) return;
+    this.cargarHistorial(this.clienteId);
+    this.cargarCompras(this.clienteId);
+    this.cargarAbonos(this.clienteId);
+  }
+
+  private mostrarExito(mensaje: string): void {
+    this.mensajeExito.set(mensaje);
+    if (this.temporizadorExito) clearTimeout(this.temporizadorExito);
+    this.temporizadorExito = setTimeout(() => this.mensajeExito.set(null), 4000);
+  }
+
+  // --- Exportación e impresión ---
+
   private nombreArchivoCliente(): string {
     const h = this.historial();
     if (!h) return 'cliente';
@@ -535,32 +717,50 @@ export class HistorialComponent implements OnInit {
   exportarMovimientos(): void {
     const movimientos = this.movimientosFiltrados();
     if (movimientos.length === 0) {
+      this.avisoError.set('No hay movimientos para exportar con el rango de fechas actual.');
       return;
     }
 
+    const h = this.historial();
+    const cliente = h ? `${h.cliente.nombre} ${h.cliente.apellido}` : '';
+
     const filas = movimientos.map((m) => [
       fechaCorta(m.fecha),
-      m.tipo,
+      this.etiquetaTipo(m),
       m.descripcion,
-      m.monto.toFixed(2),
+      `${this.signoMovimiento(m)}${m.monto.toFixed(2)}`,
       m.saldo_anterior.toFixed(2),
       m.saldo_posterior.toFixed(2),
     ]);
 
-    descargarCSV(
-      `historial_${this.nombreArchivoCliente()}`,
-      ['Fecha', 'Tipo', 'Descripcion', 'Monto', 'Saldo anterior', 'Saldo resultante'],
-      filas
-    );
+    descargarPDF({
+      titulo: 'Historial de Movimientos',
+      subtitulo: `${cliente}${this.hayFiltro() ? ` · ${this.desde() || 'inicio'} a ${this.hasta() || 'hoy'}` : ''}`,
+      nombreArchivo: `historial_${this.nombreArchivoCliente()}`,
+      encabezados: ['Fecha', 'Tipo', 'Descripción', 'Monto (Q)', 'Saldo anterior', 'Saldo resultante'],
+      filas,
+      alineaciones: { 3: 'right', 4: 'right', 5: 'right' },
+    });
   }
 
   imprimirEstadoCuenta(): void {
     imprimir();
   }
 
+  cargarAbonos(clienteId: string): void {
+    this.abonoService.listar(clienteId, 200, true).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.abonos.set(res.data);
+        }
+      },
+      error: () => this.abonos.set([])
+    });
+  }
+
   cargarCompras(clienteId: string): void {
     this.cargandoCompras.set(true);
-    this.compraService.listar(clienteId, 200).subscribe({
+    this.compraService.listar(clienteId, 200, true).subscribe({
       next: (res) => {
         this.cargandoCompras.set(false);
         if (res.success && res.data) {

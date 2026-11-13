@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { NavbarComponent } from './components/navbar/navbar';
+import { ThemeService } from './core/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -11,4 +12,7 @@ import { NavbarComponent } from './components/navbar/navbar';
 })
 export class App {
   title = 'DeudoresTienda';
+
+  // Se inyecta para aplicar el tema guardado apenas arranca la aplicación.
+  private themeService = inject(ThemeService);
 }

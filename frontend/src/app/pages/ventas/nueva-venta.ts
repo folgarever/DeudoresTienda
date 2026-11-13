@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
@@ -73,17 +73,34 @@ import { ahoraLocalInput, aISO } from '../../core/fecha.utils';
             </div>
 
             <p class="text-muted" style="font-size: 13px; margin: 8px 0 16px 0;">
-              Ingresa el nombre o descripción del producto y su precio unitario en Quetzales.
+              Ingresa el nombre o el código de barras del producto y su precio unitario en Quetzales.
             </p>
 
             @if (productosCatalogo().length > 0) {
               <div class="catalogo-box">
-                <div class="catalogo-title text-muted">Productos frecuentes — clic para agregar</div>
+                <div class="catalogo-head">
+                  <div class="catalogo-title text-muted">Productos frecuentes — clic para agregar</div>
+                  @if (categorias().length > 0) {
+                    <select
+                      class="form-control catalogo-categoria"
+                      [ngModel]="categoriaFiltro()"
+                      (ngModelChange)="categoriaFiltro.set($event)"
+                    >
+                      <option value="">Todas las categorías</option>
+                      @for (cat of categorias(); track cat) {
+                        <option [value]="cat">{{ cat }}</option>
+                      }
+                    </select>
+                  }
+                </div>
                 <div class="catalogo-chips">
-                  @for (p of productosCatalogo(); track p.id) {
+                  @for (p of catalogoFiltrado(); track p.id) {
                     <button type="button" class="chip-producto" (click)="agregarProductoCatalogo(p)">
                       {{ p.nombre }} · Q{{ p.precio_unitario | number:'1.2-2' }}
                     </button>
+                  }
+                  @if (catalogoFiltrado().length === 0) {
+                    <span class="text-muted" style="font-size: 13px;">No hay productos en esta categoría.</span>
                   }
                 </div>
               </div>
@@ -92,6 +109,9 @@ import { ahoraLocalInput, aISO } from '../../core/fecha.utils';
             <datalist id="lista-productos">
               @for (p of productosCatalogo(); track p.id) {
                 <option [value]="p.nombre"></option>
+                @if (p.codigo) {
+                  <option [value]="p.codigo"></option>
+                }
               }
             </datalist>
 
@@ -259,12 +279,31 @@ import { ahoraLocalInput, aISO } from '../../core/fecha.utils';
       margin-bottom: 16px;
     }
 
+    .catalogo-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
     .catalogo-title {
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       font-weight: 600;
       margin-bottom: 8px;
+    }
+
+    .catalogo-head .catalogo-title {
+      margin-bottom: 0;
+    }
+
+    .catalogo-categoria {
+      max-width: 220px;
+      padding: 7px 12px;
+      font-size: 13px;
     }
 
     .catalogo-chips {
@@ -436,6 +475,14 @@ export class NuevaVentaComponent implements OnInit {
   clienteSeleccionado = signal<Cliente | null>(null);
 
   productosCatalogo = signal<Producto[]>([]);
+  categorias = signal<string[]>([]);
+  categoriaFiltro = signal<string>('');
+
+  catalogoFiltrado = computed(() => {
+    const cat = this.categoriaFiltro();
+    if (!cat) return this.productosCatalogo();
+    return this.productosCatalogo().filter((p) => p.categoria === cat);
+  });
 
   fechaCompra = ahoraLocalInput();
 
@@ -456,6 +503,11 @@ export class NuevaVentaComponent implements OnInit {
     this.productoService.listar().subscribe({
       next: (res) => this.productosCatalogo.set(res.data || []),
       error: () => this.productosCatalogo.set([])
+    });
+
+    this.productoService.listarCategorias().subscribe({
+      next: (res) => this.categorias.set(res.data || []),
+      error: () => this.categorias.set([])
     });
   }
 
@@ -483,13 +535,31 @@ export class NuevaVentaComponent implements OnInit {
     if (!item) return;
 
     const texto = item.descripcion.trim().toLowerCase();
-    const producto = this.productosCatalogo().find((p) => p.nombre.trim().toLowerCase() === texto);
-    if (producto && (!item.precio_unitario || item.precio_unitario === 0)) {
-      this.items.update((items) =>
-        items.map((it, i) => (i === index ? { ...it, precio_unitario: producto.precio_unitario } : it))
-      );
-      this.calcularTotal();
-    }
+    if (!texto) return;
+
+    // Coincide por nombre o por código de barras (útil con lectores de códigos).
+    const producto = this.productosCatalogo().find(
+      (p) =>
+        p.nombre.trim().toLowerCase() === texto ||
+        (!!p.codigo && p.codigo.trim().toLowerCase() === texto)
+    );
+    if (!producto) return;
+
+    this.items.update((items) =>
+      items.map((it, i) => {
+        if (i !== index) return it;
+        const esCodigo = !!producto.codigo && it.descripcion.trim().toLowerCase() === producto.codigo.trim().toLowerCase();
+        return {
+          ...it,
+          // Si se escaneó el código, se reemplaza por el nombre del producto.
+          descripcion: esCodigo ? producto.nombre : it.descripcion,
+          precio_unitario: (!it.precio_unitario || it.precio_unitario === 0)
+            ? producto.precio_unitario
+            : it.precio_unitario,
+        };
+      })
+    );
+    this.calcularTotal();
   }
 
   cargarClientes(): void {

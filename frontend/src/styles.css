@@ -540,6 +540,102 @@ select.form-control {
 }
 
 /* ==========================================================================
+   MODO OSCURO (TEMA `theme-dark`)
+   ThemeService agrega la clase `theme-dark` al <body>. Se invierte la paleta
+   de "tinta" (negro/blanco) y se redefinen superficies, bordes y acentos para
+   fondos oscuros, conservando la identidad monocromática.
+   ========================================================================== */
+body.theme-dark {
+  --color-black: #F2F2F4;
+  --color-white: #131316;
+
+  --color-gray-light: #1E1E22;
+  --color-gray-border: #2C2C32;
+  --color-gray-border-dark: #56565E;
+  --color-gray-soft: #7A7A83;
+  --color-gray-secondary: #A6A6AE;
+  --color-gray-dark: #D2D2D8;
+  --color-gray-hover: #26262B;
+
+  --color-bg: #0D0D0F;
+  --color-surface: #17171A;
+  --color-surface-muted: #1E1E22;
+  --color-row-hover: #202025;
+
+  --color-success: #4ADE80;
+  --color-success-bg: #10261A;
+  --color-success-border: #1F5B3A;
+  --color-danger: #F87171;
+  --color-danger-bg: #2A1414;
+  --color-danger-border: #5B2A2A;
+
+  --color-badge-deuda-bg: #F2F2F4;
+  --color-badge-deuda-text: #131316;
+  --color-badge-saldado-bg: #1E1E22;
+  --color-badge-saldado-text: #D2D2D8;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --ring: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+/* Controles con colores fijos que deben adaptarse al fondo oscuro */
+body.theme-dark .form-control:focus {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.14);
+}
+
+body.theme-dark select.form-control {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23D2D2D8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+body.theme-dark .btn-uber:hover:not(:disabled) {
+  background-color: #D8D8DE;
+  border-color: #D8D8DE;
+}
+
+body.theme-dark .btn-uber:disabled {
+  background-color: #2C2C32;
+  border-color: #2C2C32;
+  color: #6E6E76;
+}
+
+body.theme-dark .skeleton {
+  background: linear-gradient(90deg, #1E1E22 25%, #26262B 37%, #1E1E22 63%);
+}
+
+/* Texto secundario sobre tarjetas resaltadas (que se invierten a claro) */
+body.theme-dark .stat-highlight .stat-label,
+body.theme-dark .stat-highlight .stat-meta,
+body.theme-dark .stat-card.highlight .stat-label,
+body.theme-dark .stat-card.highlight .stat-meta,
+body.theme-dark .debt-highlight .stat-label,
+body.theme-dark .debt-highlight .stat-meta {
+  color: #4A4A52 !important;
+}
+
+body.theme-dark .stat-highlight .stat-icon {
+  background-color: #1F1F1F !important;
+  border-color: #333333 !important;
+  color: #FFFFFF !important;
+}
+
+/* Montos y estados con color fijo en los componentes */
+body.theme-dark .amount-buy,
+body.theme-dark .amount-pay,
+body.theme-dark .field-error,
+body.theme-dark .paid-off {
+  color: var(--color-black) !important;
+}
+
+body.theme-dark .auth-wrapper {
+  background:
+    radial-gradient(1100px 460px at 50% -8%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 62%),
+    var(--color-bg) !important;
+}
+
+/* ==========================================================================
    IMPRESIÓN (ESTADOS DE CUENTA Y REPORTES)
    ========================================================================== */
 .print-only {
@@ -550,6 +646,47 @@ select.form-control {
   body {
     background-color: #FFFFFF;
     font-size: 12px;
+  }
+
+  /* La impresión siempre usa la paleta clara, aunque el tema sea oscuro. */
+  body.theme-dark {
+    --color-black: #000000;
+    --color-white: #FFFFFF;
+    --color-bg: #FFFFFF;
+    --color-surface: #FFFFFF;
+    --color-surface-muted: #FAFAFA;
+    --color-row-hover: #FAFAFA;
+    --color-gray-light: #F6F6F6;
+    --color-gray-border: #E5E5E5;
+    --color-gray-border-dark: #767676;
+    --color-gray-soft: #AFAFAF;
+    --color-gray-secondary: #5E5E5E;
+    --color-gray-dark: #333333;
+    --color-success: #067647;
+    --color-success-bg: #ECFDF3;
+    --color-success-border: #ABEFC6;
+    --color-danger: #B42318;
+    --color-danger-bg: #FEF3F2;
+    --color-danger-border: #FECDCA;
+  }
+
+  body.theme-dark .stat-highlight .stat-label,
+  body.theme-dark .stat-highlight .stat-meta,
+  body.theme-dark .stat-card.highlight .stat-label,
+  body.theme-dark .stat-card.highlight .stat-meta,
+  body.theme-dark .debt-highlight .stat-label,
+  body.theme-dark .debt-highlight .stat-meta {
+    color: #B9B9B9 !important;
+  }
+
+  body.theme-dark .stat-highlight .stat-icon {
+    background-color: #1F1F1F !important;
+    border-color: #333333 !important;
+    color: #FFFFFF !important;
+  }
+
+  body.theme-dark .auth-wrapper {
+    background: none !important;
   }
 
   .navbar-uber,

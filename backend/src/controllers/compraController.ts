@@ -27,14 +27,19 @@ export class CompraController {
   static async listar(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
-      const { cliente_id, limit } = req.query;
+      const { cliente_id, limit, incluirAnuladas } = req.query;
       const paginacion = parsePaginacion(req, 50, 200);
+
+      // Por defecto solo se listan compras vigentes; el historial puede pedir
+      // incluir las anuladas para mostrar su estado.
+      const incluir = incluirAnuladas === 'true' || incluirAnuladas === '1';
 
       const resultado = await CompraService.listarCompras(
         userId,
         cliente_id ? String(cliente_id) : undefined,
         limit ? parseInt(String(limit), 10) : 50,
-        paginacion
+        paginacion,
+        !incluir
       );
 
       res.status(200).json({
@@ -58,6 +63,24 @@ export class CompraController {
 
       res.status(200).json({
         success: true,
+        data: compra,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async anular(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const { id } = req.params;
+      const { motivo } = req.body;
+
+      const compra = await CompraService.anularCompra(userId, id, motivo);
+
+      res.status(200).json({
+        success: true,
+        message: 'Compra anulada exitosamente',
         data: compra,
       });
     } catch (err) {

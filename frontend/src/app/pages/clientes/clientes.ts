@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { ClienteService } from '../../services/cliente.service';
-import { Cliente } from '../../models';
-import { descargarCSV } from '../../core/exportar.utils';
+import { Cliente, OrdenClientes } from '../../models';
+import { descargarPDF } from '../../core/exportar.utils';
+import { fechaCorta } from '../../core/fecha.utils';
 
 @Component({
   selector: 'app-clientes',
@@ -20,7 +21,7 @@ import { descargarCSV } from '../../core/exportar.utils';
         </div>
         <div class="header-actions">
           <button class="btn-uber btn-uber-outline" (click)="exportarClientes()">
-            Exportar CSV
+            Exportar PDF
           </button>
           <button class="btn-uber" (click)="abrirModalCrear()">
             + Nuevo Cliente
@@ -58,6 +59,14 @@ import { descargarCSV } from '../../core/exportar.utils';
             Mostrar clientes inactivos
           </label>
         </div>
+        <div class="orden-box">
+          <label class="form-label" for="orden">Ordenar por</label>
+          <select id="orden" class="form-control" [(ngModel)]="orden" (change)="onBuscar()">
+            <option value="nombre">Nombre (A–Z)</option>
+            <option value="saldo">Mayor deuda</option>
+            <option value="reciente">Más recientes</option>
+          </select>
+        </div>
       </div>
 
       <!-- Estado de carga y mensajes -->
@@ -91,6 +100,8 @@ import { descargarCSV } from '../../core/exportar.utils';
               <tr>
                 <th>Nombre del Cliente</th>
                 <th>Estado</th>
+                <th>Último abono</th>
+                <th class="text-right">Días sin abonar</th>
                 <th class="text-right">Saldo Pendiente</th>
                 <th class="text-right">Acciones</th>
               </tr>
@@ -111,6 +122,12 @@ import { descargarCSV } from '../../core/exportar.utils';
                     } @else {
                       <span class="badge-uber badge-saldado">Al día (Q0.00)</span>
                     }
+                  </td>
+                  <td class="text-muted font-mono ultimo-abono-cell">
+                    {{ c.ultimo_abono ? (c.ultimo_abono | date:'dd/MM/yyyy') : 'Sin abonos' }}
+                  </td>
+                  <td class="text-right font-mono" [class.dias-alerta]="(c.dias_sin_abonar ?? 0) >= 30">
+                    {{ c.dias_sin_abonar === null || c.dias_sin_abonar === undefined ? '—' : c.dias_sin_abonar }}
                   </td>
                   <td class="text-right font-mono font-bold" [class.debt-color]="c.saldo_pendiente > 0">
                     Q{{ c.saldo_pendiente | number:'1.2-2' }}
@@ -297,6 +314,19 @@ import { descargarCSV } from '../../core/exportar.utils';
       cursor: pointer;
       user-select: none;
     }
+    .orden-box {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 180px;
+    }
+    .ultimo-abono-cell {
+      font-size: 13px;
+    }
+    .dias-alerta {
+      color: var(--color-danger);
+      font-weight: 700;
+    }
     .client-link {
       text-decoration: underline;
     }
@@ -385,6 +415,7 @@ export class ClientesComponent implements OnInit {
   terminoBusqueda = '';
   soloConDeuda = false;
   incluirInactivos = false;
+  orden: OrdenClientes = 'nombre';
 
   pagina = signal(1);
   limite = signal(20);
@@ -416,7 +447,7 @@ export class ClientesComponent implements OnInit {
     this.errorMensaje.set(null);
 
     this.clienteService
-      .listar(this.terminoBusqueda, this.soloConDeuda, this.incluirInactivos, this.pagina(), this.limite())
+      .listar(this.terminoBusqueda, this.soloConDeuda, this.incluirInactivos, this.pagina(), this.limite(), this.orden)
       .subscribe({
         next: (res) => {
           this.cargando.set(false);
@@ -443,33 +474,39 @@ export class ClientesComponent implements OnInit {
 
   exportarClientes(): void {
     // Exporta todos los clientes que cumplen los filtros actuales, sin paginar.
-    this.clienteService.listar(this.terminoBusqueda, this.soloConDeuda, this.incluirInactivos, 1, 500).subscribe({
-      next: (res) => {
-        const lista = res.data || [];
-        if (lista.length === 0) {
-          this.errorMensaje.set('No hay clientes para exportar con los filtros actuales.');
-          return;
+    this.clienteService
+      .listar(this.terminoBusqueda, this.soloConDeuda, this.incluirInactivos, 1, 500, this.orden)
+      .subscribe({
+        next: (res) => {
+          const lista = res.data || [];
+          if (lista.length === 0) {
+            this.errorMensaje.set('No hay clientes para exportar con los filtros actuales.');
+            return;
+          }
+
+          const filas = lista.map((c) => [
+            `${c.nombre} ${c.apellido}`.trim(),
+            c.saldo_pendiente.toFixed(2),
+            c.ultimo_abono ? fechaCorta(c.ultimo_abono) : 'Sin abonos',
+            c.dias_sin_abonar === null || c.dias_sin_abonar === undefined ? '—' : String(c.dias_sin_abonar),
+            c.activo ? (c.saldo_pendiente > 0 ? 'Con deuda' : 'Al dia') : 'Inactivo',
+          ]);
+
+          const totalDeuda = lista.reduce((suma, c) => suma + c.saldo_pendiente, 0);
+
+          descargarPDF({
+            titulo: 'Directorio de Clientes',
+            subtitulo: `${lista.length} cliente(s) · Deuda total: Q${totalDeuda.toFixed(2)}`,
+            nombreArchivo: 'clientes',
+            encabezados: ['Cliente', 'Saldo (Q)', 'Último abono', 'Días sin abonar', 'Estado'],
+            filas,
+            alineaciones: { 1: 'right', 3: 'right' },
+          });
+        },
+        error: (err) => {
+          this.errorMensaje.set(err.error?.message || 'Error al exportar clientes');
         }
-
-        const filas = lista.map((c) => [
-          c.nombre,
-          c.apellido,
-          `${c.nombre} ${c.apellido}`.trim(),
-          c.saldo_pendiente.toFixed(2),
-          c.saldo_pendiente > 0 ? 'Con deuda' : 'Al dia',
-          c.activo ? 'Activo' : 'Inactivo',
-        ]);
-
-        descargarCSV(
-          'clientes',
-          ['Nombre', 'Apellido', 'Nombre completo', 'Saldo pendiente (Q)', 'Estado deuda', 'Estado'],
-          filas
-        );
-      },
-      error: (err) => {
-        this.errorMensaje.set(err.error?.message || 'Error al exportar clientes');
-      }
-    });
+      });
   }
 
   private mostrarExito(mensaje: string): void {

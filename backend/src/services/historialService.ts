@@ -18,12 +18,13 @@ export class HistorialService {
     // 1. Obtener cliente asegurando que pertenece al usuario
     const cliente = await ClienteService.obtenerPorId(userId, clienteId);
 
-    // 2. Obtener compras del cliente para estadisticas
+    // 2. Obtener compras del cliente para estadisticas (excluyendo anuladas)
     const { data: compras, error: errCompras } = await supabase
       .from('compras')
       .select('total, fecha_compra')
       .eq('cliente_id', clienteId)
       .eq('user_id', userId)
+      .eq('anulada', false)
       .order('fecha_compra', { ascending: true });
 
     if (errCompras) {
@@ -45,12 +46,13 @@ export class HistorialService {
       totalDineroComprado = Math.round(totalDineroComprado * 100) / 100;
     }
 
-    // 3. Obtener total dinero abonado
+    // 3. Obtener total dinero abonado (excluyendo anulados)
     const { data: abonos, error: errAbonos } = await supabase
       .from('abonos_pagos')
       .select('monto')
       .eq('cliente_id', clienteId)
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('anulado', false);
 
     if (errAbonos) {
       throw createHistorialError('Error al consultar abonos del cliente: ' + errAbonos.message, 500);

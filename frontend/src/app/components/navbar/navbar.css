@@ -153,6 +153,27 @@
   color: #9A9A9A;
 }
 
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  background-color: transparent;
+  color: #FFFFFF;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.16s ease-in-out;
+}
+
+.theme-toggle:hover {
+  background-color: #FFFFFF;
+  color: #000000;
+  border-color: #FFFFFF;
+}
+
 .btn-logout {
   display: inline-flex;
   align-items: center;

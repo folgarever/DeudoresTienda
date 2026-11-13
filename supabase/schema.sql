@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS compras (
     total NUMERIC(12, 2) NOT NULL CHECK (total > 0.00),
     estado_pago VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE' CHECK (estado_pago IN ('PENDIENTE', 'PARCIAL', 'PAGADO')),
     saldo_generado NUMERIC(12, 2) NOT NULL CHECK (saldo_generado >= 0.00),
+    anulada BOOLEAN NOT NULL DEFAULT FALSE,
+    anulada_at TIMESTAMPTZ,
+    motivo_anulacion TEXT,
     fecha_compra TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -93,6 +96,9 @@ CREATE TABLE IF NOT EXISTS abonos_pagos (
     saldo_anterior NUMERIC(12, 2) NOT NULL CHECK (saldo_anterior >= 0.00),
     saldo_restante NUMERIC(12, 2) NOT NULL CHECK (saldo_restante >= 0.00),
     observaciones TEXT,
+    anulado BOOLEAN NOT NULL DEFAULT FALSE,
+    anulado_at TIMESTAMPTZ,
+    motivo_anulacion TEXT,
     fecha_pago TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -108,7 +114,7 @@ CREATE TABLE IF NOT EXISTS movimientos_financieros (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cliente_id UUID NOT NULL REFERENCES clientes(id) ON DELETE RESTRICT,
     user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
-    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('COMPRA', 'ABONO')),
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('COMPRA', 'ABONO', 'ANULACION_COMPRA', 'ANULACION_ABONO')),
     referencia_id UUID NOT NULL,
     descripcion TEXT NOT NULL,
     monto NUMERIC(12, 2) NOT NULL CHECK (monto > 0.00),
@@ -129,6 +135,8 @@ CREATE TABLE IF NOT EXISTS productos (
     user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
     nombre VARCHAR(150) NOT NULL,
     precio_unitario NUMERIC(12, 2) NOT NULL DEFAULT 0.00 CHECK (precio_unitario >= 0.00),
+    categoria VARCHAR(80),
+    codigo VARCHAR(50),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -136,6 +144,8 @@ CREATE TABLE IF NOT EXISTS productos (
 
 CREATE INDEX IF NOT EXISTS idx_productos_user ON productos(user_id, activo);
 CREATE INDEX IF NOT EXISTS idx_productos_nombre ON productos(user_id, LOWER(nombre));
+CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(user_id, categoria);
+CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos(user_id, LOWER(codigo));
 
 -- -----------------------------------------------------------------------------
 -- PERMISOS Y POLITICAS DE SEGURIDAD (RLS)
@@ -149,6 +159,33 @@ ALTER TABLE detalles_compra DISABLE ROW LEVEL SECURITY;
 ALTER TABLE abonos_pagos DISABLE ROW LEVEL SECURITY;
 ALTER TABLE movimientos_financieros DISABLE ROW LEVEL SECURITY;
 ALTER TABLE productos DISABLE ROW LEVEL SECURITY;
+
+-- =============================================================================
+-- MIGRACIONES INCREMENTALES
+-- Permiten actualizar una base de datos ya creada sin perder informacion.
+-- Son idempotentes (IF NOT EXISTS), por lo que es seguro volver a ejecutarlas.
+-- =============================================================================
+
+-- Productos: categoria y codigo de barras
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS categoria VARCHAR(80);
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS codigo VARCHAR(50);
+CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(user_id, categoria);
+CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos(user_id, LOWER(codigo));
+
+-- Compras: anulacion (borrado logico reversible)
+ALTER TABLE compras ADD COLUMN IF NOT EXISTS anulada BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE compras ADD COLUMN IF NOT EXISTS anulada_at TIMESTAMPTZ;
+ALTER TABLE compras ADD COLUMN IF NOT EXISTS motivo_anulacion TEXT;
+
+-- Abonos: anulacion (borrado logico reversible)
+ALTER TABLE abonos_pagos ADD COLUMN IF NOT EXISTS anulado BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE abonos_pagos ADD COLUMN IF NOT EXISTS anulado_at TIMESTAMPTZ;
+ALTER TABLE abonos_pagos ADD COLUMN IF NOT EXISTS motivo_anulacion TEXT;
+
+-- Movimientos financieros: admitir movimientos de anulacion
+ALTER TABLE movimientos_financieros DROP CONSTRAINT IF EXISTS movimientos_financieros_tipo_check;
+ALTER TABLE movimientos_financieros ADD CONSTRAINT movimientos_financieros_tipo_check
+    CHECK (tipo IN ('COMPRA', 'ABONO', 'ANULACION_COMPRA', 'ANULACION_ABONO'));
 
 -- =============================================================================
 -- FUNCIONES TRANSACCIONALES RPC (Integridad Absoluta)
@@ -175,12 +212,12 @@ DECLARE
 BEGIN
     SELECT COALESCE(SUM(monto), 0.00) INTO v_total_abonado
     FROM abonos_pagos
-    WHERE cliente_id = p_cliente_id AND user_id = p_user_id;
+    WHERE cliente_id = p_cliente_id AND user_id = p_user_id AND anulado = FALSE;
 
     FOR v_compra IN
         SELECT id, total
         FROM compras
-        WHERE cliente_id = p_cliente_id AND user_id = p_user_id
+        WHERE cliente_id = p_cliente_id AND user_id = p_user_id AND anulada = FALSE
         ORDER BY fecha_compra ASC, created_at ASC
     LOOP
         IF v_total_abonado >= v_acumulado + v_compra.total THEN
@@ -463,6 +500,168 @@ BEGIN
         'saldo_anterior', v_saldo_actual,
         'nuevo_saldo', v_nuevo_saldo,
         'fecha_pago', v_fecha_efectiva
+    );
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- FUNCION: anular_compra_transaccional
+-- Anula (borrado logico) una compra, revierte su efecto en el saldo del cliente
+-- y deja un movimiento de trazabilidad. No permite dejar saldo negativo.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION anular_compra_transaccional(
+    p_user_id UUID,
+    p_compra_id UUID,
+    p_motivo TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_compra RECORD;
+    v_saldo_actual NUMERIC(12, 2);
+    v_nuevo_saldo NUMERIC(12, 2);
+BEGIN
+    SELECT id, cliente_id, total, anulada INTO v_compra
+    FROM compras
+    WHERE id = p_compra_id AND user_id = p_user_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Compra no encontrada';
+    END IF;
+
+    IF v_compra.anulada THEN
+        RAISE EXCEPTION 'La compra ya estaba anulada';
+    END IF;
+
+    SELECT saldo_pendiente INTO v_saldo_actual
+    FROM clientes
+    WHERE id = v_compra.cliente_id AND user_id = p_user_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Cliente no encontrado';
+    END IF;
+
+    v_nuevo_saldo := ROUND(v_saldo_actual - v_compra.total, 2);
+
+    IF v_nuevo_saldo < 0.00 THEN
+        RAISE EXCEPTION 'No se puede anular la compra: los abonos registrados superan la deuda restante. Anule primero un abono.';
+    END IF;
+
+    UPDATE compras
+    SET anulada = TRUE,
+        anulada_at = NOW(),
+        motivo_anulacion = NULLIF(TRIM(p_motivo), '')
+    WHERE id = p_compra_id;
+
+    UPDATE clientes
+    SET saldo_pendiente = v_nuevo_saldo,
+        updated_at = NOW()
+    WHERE id = v_compra.cliente_id;
+
+    INSERT INTO movimientos_financieros (
+        cliente_id, user_id, tipo, referencia_id, descripcion,
+        monto, saldo_anterior, saldo_posterior, fecha
+    ) VALUES (
+        v_compra.cliente_id,
+        p_user_id,
+        'ANULACION_COMPRA',
+        p_compra_id,
+        CONCAT('Anulacion de compra por Q', v_compra.total),
+        v_compra.total,
+        v_saldo_actual,
+        v_nuevo_saldo,
+        NOW()
+    );
+
+    PERFORM recalcular_estados_pago_cliente(p_user_id, v_compra.cliente_id);
+
+    RETURN jsonb_build_object(
+        'compra_id', p_compra_id,
+        'saldo_anterior', v_saldo_actual,
+        'nuevo_saldo', v_nuevo_saldo
+    );
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- FUNCION: anular_abono_transaccional
+-- Anula (borrado logico) un abono, devuelve el monto a la deuda del cliente
+-- y deja un movimiento de trazabilidad.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION anular_abono_transaccional(
+    p_user_id UUID,
+    p_abono_id UUID,
+    p_motivo TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_abono RECORD;
+    v_saldo_actual NUMERIC(12, 2);
+    v_nuevo_saldo NUMERIC(12, 2);
+BEGIN
+    SELECT id, cliente_id, monto, anulado INTO v_abono
+    FROM abonos_pagos
+    WHERE id = p_abono_id AND user_id = p_user_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Abono no encontrado';
+    END IF;
+
+    IF v_abono.anulado THEN
+        RAISE EXCEPTION 'El abono ya estaba anulado';
+    END IF;
+
+    SELECT saldo_pendiente INTO v_saldo_actual
+    FROM clientes
+    WHERE id = v_abono.cliente_id AND user_id = p_user_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Cliente no encontrado';
+    END IF;
+
+    v_nuevo_saldo := ROUND(v_saldo_actual + v_abono.monto, 2);
+
+    UPDATE abonos_pagos
+    SET anulado = TRUE,
+        anulado_at = NOW(),
+        motivo_anulacion = NULLIF(TRIM(p_motivo), '')
+    WHERE id = p_abono_id;
+
+    UPDATE clientes
+    SET saldo_pendiente = v_nuevo_saldo,
+        updated_at = NOW()
+    WHERE id = v_abono.cliente_id;
+
+    INSERT INTO movimientos_financieros (
+        cliente_id, user_id, tipo, referencia_id, descripcion,
+        monto, saldo_anterior, saldo_posterior, fecha
+    ) VALUES (
+        v_abono.cliente_id,
+        p_user_id,
+        'ANULACION_ABONO',
+        p_abono_id,
+        CONCAT('Anulacion de abono por Q', v_abono.monto),
+        v_abono.monto,
+        v_saldo_actual,
+        v_nuevo_saldo,
+        NOW()
+    );
+
+    PERFORM recalcular_estados_pago_cliente(p_user_id, v_abono.cliente_id);
+
+    RETURN jsonb_build_object(
+        'abono_id', p_abono_id,
+        'saldo_anterior', v_saldo_actual,
+        'nuevo_saldo', v_nuevo_saldo
     );
 END;
 $$;

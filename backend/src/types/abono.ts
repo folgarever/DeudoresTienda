@@ -14,6 +14,9 @@ export interface AbonoPago {
   saldo_anterior: number;
   saldo_restante: number;
   observaciones?: string;
+  anulado?: boolean;
+  anulado_at?: string | null;
+  motivo_anulacion?: string | null;
   fecha_pago: string;
   created_at?: string;
   cliente?: {

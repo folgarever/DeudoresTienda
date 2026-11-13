@@ -4,7 +4,7 @@ export interface MovimientoFinanciero {
   id: string;
   cliente_id: string;
   user_id: string;
-  tipo: 'COMPRA' | 'ABONO';
+  tipo: 'COMPRA' | 'ABONO' | 'ANULACION_COMPRA' | 'ANULACION_ABONO';
   referencia_id: string;
   descripcion: string;
   monto: number;

@@ -190,13 +190,18 @@ export class AbonoService {
     userId: string,
     clienteId?: string,
     limit: number = 50,
-    paginacion?: Paginacion | null
+    paginacion?: Paginacion | null,
+    soloActivos: boolean = false
   ): Promise<ListarAbonosResultado> {
     let query = supabase
       .from('abonos_pagos')
       .select('*, cliente:clientes(id, nombre, apellido)', { count: 'exact' })
       .eq('user_id', userId)
       .order('fecha_pago', { ascending: false });
+
+    if (soloActivos) {
+      query = query.eq('anulado', false);
+    }
 
     if (clienteId) {
       query = query.eq('cliente_id', clienteId);
@@ -233,5 +238,117 @@ export class AbonoService {
     }
 
     return normalizarAbono(abono);
+  }
+
+  // Anula (borrado logico) un abono devolviendo su monto a la deuda del cliente.
+  // Usa la funcion transaccional RPC cuando existe; si no, aplica un fallback
+  // en Node.js con compensacion ante fallos.
+  static async anularAbono(userId: string, abonoId: string, motivo?: string): Promise<AbonoPago> {
+    if (!abonoId) {
+      throw createAbonoError('El ID del abono es requerido');
+    }
+
+    const motivoLimpio = motivo?.trim() || null;
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc('anular_abono_transaccional', {
+      p_user_id: userId,
+      p_abono_id: abonoId,
+      p_motivo: motivoLimpio,
+    });
+
+    if (!rpcError && rpcData) {
+      return this.obtenerAbonoPorId(userId, abonoId);
+    }
+
+    if (rpcError && !esFuncionInexistente(rpcError)) {
+      throw createAbonoError(rpcError.message || 'No se pudo anular el abono', 400);
+    }
+
+    console.warn('[ABONO] RPC anular_abono_transaccional no disponible; usando fallback en Node.js.');
+
+    const { data: abono, error: errAbono } = await supabase
+      .from('abonos_pagos')
+      .select('id, cliente_id, monto, anulado')
+      .eq('id', abonoId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (errAbono || !abono) {
+      throw createAbonoError('Abono o pago no encontrado', 404);
+    }
+
+    if (abono.anulado) {
+      throw createAbonoError('El abono ya estaba anulado');
+    }
+
+    const { data: cliente, error: errCliente } = await supabase
+      .from('clientes')
+      .select('id, saldo_pendiente')
+      .eq('id', abono.cliente_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (errCliente || !cliente) {
+      throw createAbonoError('Cliente no encontrado', 404);
+    }
+
+    const monto = Math.round((Number(abono.monto) || 0) * 100) / 100;
+    const saldoAnterior = Math.round((Number(cliente.saldo_pendiente) || 0) * 100) / 100;
+    const nuevoSaldo = Math.round((saldoAnterior + monto) * 100) / 100;
+
+    const { error: errAnular } = await supabase
+      .from('abonos_pagos')
+      .update({
+        anulado: true,
+        anulado_at: new Date().toISOString(),
+        motivo_anulacion: motivoLimpio,
+      })
+      .eq('id', abonoId)
+      .eq('user_id', userId);
+
+    if (errAnular) {
+      throw createAbonoError('Error al anular el abono: ' + errAnular.message, 500);
+    }
+
+    const { error: errSaldo } = await supabase
+      .from('clientes')
+      .update({
+        saldo_pendiente: nuevoSaldo,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', abono.cliente_id)
+      .eq('user_id', userId);
+
+    if (errSaldo) {
+      // Compensacion: se restaura el abono si no se pudo ajustar el saldo.
+      await supabase
+        .from('abonos_pagos')
+        .update({ anulado: false, anulado_at: null, motivo_anulacion: null })
+        .eq('id', abonoId)
+        .eq('user_id', userId);
+      throw createAbonoError('Error al actualizar el saldo del cliente: ' + errSaldo.message, 500);
+    }
+
+    const { error: errMov } = await supabase
+      .from('movimientos_financieros')
+      .insert({
+        cliente_id: abono.cliente_id,
+        user_id: userId,
+        tipo: 'ANULACION_ABONO',
+        referencia_id: abonoId,
+        descripcion: `Anulacion de abono por Q${monto.toFixed(2)}`,
+        monto,
+        saldo_anterior: saldoAnterior,
+        saldo_posterior: nuevoSaldo,
+        fecha: new Date().toISOString(),
+      });
+
+    if (errMov) {
+      console.error('[ABONO] No se pudo registrar el movimiento de anulacion:', errMov.message);
+    }
+
+    await this.recalcularEstadosPago(userId, abono.cliente_id);
+
+    return this.obtenerAbonoPorId(userId, abonoId);
   }
 }

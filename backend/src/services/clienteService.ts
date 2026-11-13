@@ -1,11 +1,12 @@
 import { supabase } from '../config/supabase';
-import { Cliente, CrearClienteDTO, ActualizarClienteDTO, FiltroClientesDTO } from '../types/cliente';
+import { Cliente, CrearClienteDTO, ActualizarClienteDTO, FiltroClientesDTO, OrdenClientes } from '../types/cliente';
 import { Paginacion } from '../utils/pagination';
 import { sanitizeSearchTerm } from '../utils/sanitize';
 import { AppError } from '../middlewares/errorHandler';
 
 const MAX_NOMBRE = 100;
 const MAX_APELLIDO = 100;
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 function createClienteError(message: string, statusCode: number = 400): AppError {
   const err = new Error(message) as AppError;
@@ -86,7 +87,7 @@ export class ClienteService {
       }
     }
 
-    query = query.order('nombre', { ascending: true });
+    query = this.aplicarOrden(query, filtros?.orden);
 
     if (paginacion) {
       query = query.range(paginacion.offset, paginacion.offset + paginacion.limit - 1);
@@ -98,10 +99,66 @@ export class ClienteService {
       throw createClienteError('Error al listar clientes: ' + error.message, 500);
     }
 
+    const data = (clientes || []).map(normalizarCliente);
+    await this.enriquecerConUltimoAbono(userId, data);
+
     return {
-      data: (clientes || []).map(normalizarCliente),
-      total: count ?? (clientes || []).length,
+      data,
+      total: count ?? data.length,
     };
+  }
+
+  // Aplica el criterio de orden solicitado manteniendo un orden estable por nombre.
+  private static aplicarOrden(query: any, orden?: OrdenClientes): any {
+    switch (orden) {
+      case 'saldo':
+        return query.order('saldo_pendiente', { ascending: false }).order('nombre', { ascending: true });
+      case 'reciente':
+        return query.order('created_at', { ascending: false }).order('nombre', { ascending: true });
+      case 'nombre':
+      default:
+        return query.order('nombre', { ascending: true });
+    }
+  }
+
+  // Agrega a cada cliente la fecha de su ultimo abono y los dias transcurridos.
+  // Es un dato auxiliar: si la consulta falla no se interrumpe el listado.
+  private static async enriquecerConUltimoAbono(userId: string, clientes: Cliente[]): Promise<void> {
+    if (clientes.length === 0) return;
+
+    const ids = clientes.map((c) => c.id);
+    const { data: abonos, error } = await supabase
+      .from('abonos_pagos')
+      .select('cliente_id, fecha_pago')
+      .eq('user_id', userId)
+      .eq('anulado', false)
+      .in('cliente_id', ids)
+      .order('fecha_pago', { ascending: false });
+
+    if (error) {
+      // Sin la columna de anulacion (esquema sin migrar) se degrada el dato,
+      // pero el listado de clientes sigue funcionando.
+      for (const c of clientes) {
+        c.ultimo_abono = null;
+        c.dias_sin_abonar = null;
+      }
+      return;
+    }
+
+    const ultimoPorCliente = new Map<string, string>();
+    for (const a of abonos || []) {
+      const fila = a as { cliente_id: string; fecha_pago: string };
+      if (!ultimoPorCliente.has(fila.cliente_id)) {
+        ultimoPorCliente.set(fila.cliente_id, fila.fecha_pago);
+      }
+    }
+
+    const ahora = Date.now();
+    for (const c of clientes) {
+      const fecha = ultimoPorCliente.get(c.id) ?? null;
+      c.ultimo_abono = fecha;
+      c.dias_sin_abonar = fecha ? Math.floor((ahora - new Date(fecha).getTime()) / MS_POR_DIA) : null;
+    }
   }
 
   static async obtenerPorId(userId: string, clienteId: string): Promise<Cliente> {

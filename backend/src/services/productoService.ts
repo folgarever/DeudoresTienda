@@ -5,6 +5,8 @@ import { sanitizeSearchTerm } from '../utils/sanitize';
 import { AppError } from '../middlewares/errorHandler';
 
 const MAX_NOMBRE = 150;
+const MAX_CATEGORIA = 80;
+const MAX_CODIGO = 50;
 
 function createProductoError(message: string, statusCode: number = 400): AppError {
   const err = new Error(message) as AppError;
@@ -27,6 +29,18 @@ function validarPrecio(precio: unknown): number {
   return Math.round(valor * 100) / 100;
 }
 
+// Normaliza la categoria/codigo opcionales: recorta espacios y convierte
+// cadenas vacias en null para no guardar valores en blanco.
+function normalizarTextoOpcional(valor: unknown, max: number, etiqueta: string): string | null {
+  if (valor === undefined || valor === null) return null;
+  const texto = String(valor).trim();
+  if (!texto) return null;
+  if (texto.length > max) {
+    throw createProductoError(`El ${etiqueta} no puede superar los ${max} caracteres`);
+  }
+  return texto;
+}
+
 export interface ListarProductosResultado {
   data: Producto[];
   total: number;
@@ -47,6 +61,8 @@ export class ProductoService {
     }
 
     const precio_unitario = validarPrecio(dto.precio_unitario ?? 0);
+    const categoria = normalizarTextoOpcional(dto.categoria, MAX_CATEGORIA, 'categoría');
+    const codigo = normalizarTextoOpcional(dto.codigo, MAX_CODIGO, 'código de barras');
 
     const { data: producto, error } = await supabase
       .from('productos')
@@ -54,6 +70,8 @@ export class ProductoService {
         user_id: userId,
         nombre,
         precio_unitario,
+        categoria,
+        codigo,
         activo: true,
       })
       .select('*')
@@ -80,10 +98,15 @@ export class ProductoService {
       query = query.eq('activo', true);
     }
 
+    if (filtros?.categoria) {
+      query = query.eq('categoria', filtros.categoria);
+    }
+
     if (filtros?.search) {
       const termino = sanitizeSearchTerm(filtros.search);
       if (termino.length > 0) {
-        query = query.ilike('nombre', `%${termino}%`);
+        // La busqueda coincide con el nombre o el codigo de barras.
+        query = query.or(`nombre.ilike.%${termino}%,codigo.ilike.%${termino}%`);
       }
     }
 
@@ -103,6 +126,28 @@ export class ProductoService {
       data: (productos || []).map(normalizarProducto),
       total: count ?? (productos || []).length,
     };
+  }
+
+  // Devuelve la lista de categorias distintas registradas por el usuario.
+  static async listarCategorias(userId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('productos')
+      .select('categoria')
+      .eq('user_id', userId)
+      .eq('activo', true)
+      .not('categoria', 'is', null);
+
+    if (error) {
+      throw createProductoError('Error al listar categorías: ' + error.message, 500);
+    }
+
+    const categorias = new Set<string>();
+    for (const fila of data || []) {
+      const valor = (fila as { categoria?: string | null }).categoria;
+      if (valor) categorias.add(valor);
+    }
+
+    return Array.from(categorias).sort((a, b) => a.localeCompare(b, 'es'));
   }
 
   static async obtenerPorId(userId: string, productoId: string): Promise<Producto> {
@@ -146,6 +191,14 @@ export class ProductoService {
 
     if (dto.precio_unitario !== undefined) {
       cambios.precio_unitario = validarPrecio(dto.precio_unitario);
+    }
+
+    if (dto.categoria !== undefined) {
+      cambios.categoria = normalizarTextoOpcional(dto.categoria, MAX_CATEGORIA, 'categoría');
+    }
+
+    if (dto.codigo !== undefined) {
+      cambios.codigo = normalizarTextoOpcional(dto.codigo, MAX_CODIGO, 'código de barras');
     }
 
     const { data: producto, error } = await supabase

@@ -12,6 +12,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+  <!-- Aplica el tema guardado antes de que cargue Angular (evita el destello). -->
+  <script>
+    try {
+      if (localStorage.getItem('deudores_tema') === 'dark') {
+        document.body.classList.add('theme-dark');
+      }
+    } catch (e) {}
+  </script>
   <app-root></app-root>
 </body>
 </html>
