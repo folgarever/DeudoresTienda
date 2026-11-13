@@ -142,6 +142,12 @@ CREATE TABLE IF NOT EXISTS productos (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Asegurar columnas nuevas antes de crear indices que las referencian.
+-- Necesario para bases ya existentes creadas con una version previa del esquema,
+-- donde CREATE TABLE IF NOT EXISTS no agrega las columnas faltantes.
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS categoria VARCHAR(80);
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS codigo VARCHAR(50);
+
 CREATE INDEX IF NOT EXISTS idx_productos_user ON productos(user_id, activo);
 CREATE INDEX IF NOT EXISTS idx_productos_nombre ON productos(user_id, LOWER(nombre));
 CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(user_id, categoria);
@@ -167,10 +173,7 @@ ALTER TABLE productos DISABLE ROW LEVEL SECURITY;
 -- =============================================================================
 
 -- Productos: categoria y codigo de barras
-ALTER TABLE productos ADD COLUMN IF NOT EXISTS categoria VARCHAR(80);
-ALTER TABLE productos ADD COLUMN IF NOT EXISTS codigo VARCHAR(50);
-CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(user_id, categoria);
-CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos(user_id, LOWER(codigo));
+-- (las columnas ya se aseguran arriba, antes de crear sus indices)
 
 -- Compras: anulacion (borrado logico reversible)
 ALTER TABLE compras ADD COLUMN IF NOT EXISTS anulada BOOLEAN NOT NULL DEFAULT FALSE;
