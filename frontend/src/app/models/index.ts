@@ -122,3 +122,33 @@ export interface DashboardStats {
   ultimos_abonos: AbonoPago[];
   top_deudores: Cliente[];
 }
+
+export interface ResumenCajaDia {
+  fecha: string;
+  total_ventas: number;
+  total_abonos: number;
+  cantidad_compras: number;
+  cantidad_abonos: number;
+}
+
+export interface ResumenCaja {
+  desde: string;
+  hasta: string;
+  total_ventas: number;
+  total_abonos: number;
+  cantidad_compras: number;
+  cantidad_abonos: number;
+  promedio_venta: number;
+  diferencia: number;
+  dias: ResumenCajaDia[];
+}
+
+export interface Producto {
+  id: string;
+  user_id: string;
+  nombre: string;
+  precio_unitario: number;
+  activo: boolean;
+  created_at?: string;
+  updated_at?: string;
+}

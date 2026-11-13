@@ -23,6 +23,9 @@ import { DashboardStats } from '../../models';
           <a routerLink="/abonos/nuevo" class="btn-uber btn-uber-secondary">
             + Registrar Abono
           </a>
+          <a routerLink="/reportes" class="btn-uber btn-uber-outline">
+            Cierre de Caja
+          </a>
         </div>
       </div>
 
