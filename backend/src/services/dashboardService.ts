@@ -48,11 +48,12 @@ export class DashboardService {
       .sort((a, b) => b.saldo_pendiente - a.saldo_pendiente)
       .slice(0, 10);
 
-    // 2. Total de compras registradas y monto total vendido
+    // 2. Total de compras registradas y monto total vendido (excluyendo anuladas)
     const { data: comprasTotales, error: errCompras } = await supabase
       .from('compras')
       .select('total')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('anulada', false);
 
     if (errCompras) {
       throw createDashboardError('Error al consultar compras: ' + errCompras.message, 500);
@@ -65,11 +66,12 @@ export class DashboardService {
     }
     totalDineroVendido = Math.round(totalDineroVendido * 100) / 100;
 
-    // 3. Total de dinero abonado
+    // 3. Total de dinero abonado (excluyendo anulados)
     const { data: abonos, error: errAbonos } = await supabase
       .from('abonos_pagos')
       .select('monto')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('anulado', false);
 
     if (errAbonos) {
       throw createDashboardError('Error al consultar abonos: ' + errAbonos.message, 500);
@@ -81,11 +83,11 @@ export class DashboardService {
     }
     totalDineroAbonado = Math.round(totalDineroAbonado * 100) / 100;
 
-    // 4. Compras recientes (ultimas 5)
-    const comprasRecientes = (await CompraService.listarCompras(userId, undefined, 5)).data;
+    // 4. Compras recientes (ultimas 5, excluyendo anuladas)
+    const comprasRecientes = (await CompraService.listarCompras(userId, undefined, 5, null, true)).data;
 
-    // 5. Ultimos abonos registrados (ultimos 5)
-    const ultimosAbonos = (await AbonoService.listarAbonos(userId, undefined, 5)).data;
+    // 5. Ultimos abonos registrados (ultimos 5, excluyendo anulados)
+    const ultimosAbonos = (await AbonoService.listarAbonos(userId, undefined, 5, null, true)).data;
 
     return {
       total_clientes: totalClientes,

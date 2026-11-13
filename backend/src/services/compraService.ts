@@ -56,6 +56,19 @@ export interface ListarComprasResultado {
 }
 
 export class CompraService {
+  // Actualiza compras.estado_pago segun los abonos vigentes. Se usa tras una
+  // anulacion para mantener el estado FIFO coherente. Si la funcion RPC no
+  // existe el error se ignora.
+  private static async recalcularEstadosPago(userId: string, clienteId: string): Promise<void> {
+    const { error } = await supabase.rpc('recalcular_estados_pago_cliente', {
+      p_user_id: userId,
+      p_cliente_id: clienteId,
+    });
+    if (error && !esFuncionInexistente(error)) {
+      console.error('[COMPRA] No se pudo recalcular el estado de pago de las compras:', error.message);
+    }
+  }
+
   static async registrarCompra(userId: string, dto: RegistrarCompraDTO): Promise<Compra> {
     const clienteId = dto.cliente_id?.trim();
     const items = dto.items;
@@ -226,13 +239,18 @@ export class CompraService {
     userId: string,
     clienteId?: string,
     limit: number = 50,
-    paginacion?: Paginacion | null
+    paginacion?: Paginacion | null,
+    soloActivas: boolean = false
   ): Promise<ListarComprasResultado> {
     let query = supabase
       .from('compras')
       .select('*, cliente:clientes(id, nombre, apellido), detalles:detalles_compra(*)', { count: 'exact' })
       .eq('user_id', userId)
       .order('fecha_compra', { ascending: false });
+
+    if (soloActivas) {
+      query = query.eq('anulada', false);
+    }
 
     if (clienteId) {
       query = query.eq('cliente_id', clienteId);
@@ -269,5 +287,121 @@ export class CompraService {
     }
 
     return normalizarCompra(compra);
+  }
+
+  // Anula (borrado logico) una compra devolviendo su monto al saldo del cliente.
+  // Usa la funcion transaccional RPC cuando existe; si no, aplica un fallback
+  // en Node.js con compensacion ante fallos.
+  static async anularCompra(userId: string, compraId: string, motivo?: string): Promise<Compra> {
+    if (!compraId) {
+      throw createCompraError('El ID de la compra es requerido');
+    }
+
+    const motivoLimpio = motivo?.trim() || null;
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc('anular_compra_transaccional', {
+      p_user_id: userId,
+      p_compra_id: compraId,
+      p_motivo: motivoLimpio,
+    });
+
+    if (!rpcError && rpcData) {
+      return this.obtenerCompraPorId(userId, compraId);
+    }
+
+    if (rpcError && !esFuncionInexistente(rpcError)) {
+      throw createCompraError(rpcError.message || 'No se pudo anular la compra', 400);
+    }
+
+    console.warn('[COMPRA] RPC anular_compra_transaccional no disponible; usando fallback en Node.js.');
+
+    const { data: compra, error: errCompra } = await supabase
+      .from('compras')
+      .select('id, cliente_id, total, anulada')
+      .eq('id', compraId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (errCompra || !compra) {
+      throw createCompraError('Compra no encontrada', 404);
+    }
+
+    if (compra.anulada) {
+      throw createCompraError('La compra ya estaba anulada');
+    }
+
+    const { data: cliente, error: errCliente } = await supabase
+      .from('clientes')
+      .select('id, saldo_pendiente')
+      .eq('id', compra.cliente_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (errCliente || !cliente) {
+      throw createCompraError('Cliente no encontrado', 404);
+    }
+
+    const total = Math.round((Number(compra.total) || 0) * 100) / 100;
+    const saldoAnterior = Math.round((Number(cliente.saldo_pendiente) || 0) * 100) / 100;
+    const nuevoSaldo = Math.round((saldoAnterior - total) * 100) / 100;
+
+    if (nuevoSaldo < 0) {
+      throw createCompraError('No se puede anular la compra: los abonos registrados superan la deuda restante. Anule primero un abono.');
+    }
+
+    const { error: errAnular } = await supabase
+      .from('compras')
+      .update({
+        anulada: true,
+        anulada_at: new Date().toISOString(),
+        motivo_anulacion: motivoLimpio,
+      })
+      .eq('id', compraId)
+      .eq('user_id', userId);
+
+    if (errAnular) {
+      throw createCompraError('Error al anular la compra: ' + errAnular.message, 500);
+    }
+
+    const { error: errSaldo } = await supabase
+      .from('clientes')
+      .update({
+        saldo_pendiente: nuevoSaldo,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', compra.cliente_id)
+      .eq('user_id', userId);
+
+    if (errSaldo) {
+      // Compensacion: se restaura la compra si no se pudo ajustar el saldo.
+      await supabase
+        .from('compras')
+        .update({ anulada: false, anulada_at: null, motivo_anulacion: null })
+        .eq('id', compraId)
+        .eq('user_id', userId);
+      throw createCompraError('Error al actualizar el saldo del cliente: ' + errSaldo.message, 500);
+    }
+
+    const { error: errMov } = await supabase
+      .from('movimientos_financieros')
+      .insert({
+        cliente_id: compra.cliente_id,
+        user_id: userId,
+        tipo: 'ANULACION_COMPRA',
+        referencia_id: compraId,
+        descripcion: `Anulacion de compra por Q${total.toFixed(2)}`,
+        monto: total,
+        saldo_anterior: saldoAnterior,
+        saldo_posterior: nuevoSaldo,
+        fecha: new Date().toISOString(),
+      });
+
+    if (errMov) {
+      console.error('[COMPRA] No se pudo registrar el movimiento de anulacion:', errMov.message);
+    }
+
+    await this.recalcularEstadosPago(userId, compra.cliente_id);
+
+    return this.obtenerCompraPorId(userId, compraId);
   }
 }

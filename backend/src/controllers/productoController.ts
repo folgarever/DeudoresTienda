@@ -6,9 +6,9 @@ export class ProductoController {
   static async crear(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
-      const { nombre, precio_unitario } = req.body;
+      const { nombre, precio_unitario, categoria, codigo } = req.body;
 
-      const producto = await ProductoService.crear(userId, { nombre, precio_unitario });
+      const producto = await ProductoService.crear(userId, { nombre, precio_unitario, categoria, codigo });
 
       res.status(201).json({
         success: true,
@@ -23,13 +23,14 @@ export class ProductoController {
   static async listar(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
-      const { search, incluirInactivos } = req.query;
+      const { search, incluirInactivos, categoria } = req.query;
       const paginacion = parsePaginacion(req, 200, 500);
 
       const resultado = await ProductoService.listar(
         userId,
         {
           search: search ? String(search) : undefined,
+          categoria: categoria ? String(categoria) : undefined,
           incluirInactivos: incluirInactivos === 'true',
         },
         paginacion
@@ -41,6 +42,21 @@ export class ProductoController {
         page: paginacion?.page ?? 1,
         limit: paginacion?.limit ?? resultado.data.length,
         data: resultado.data,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async listarCategorias(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+
+      const categorias = await ProductoService.listarCategorias(userId);
+
+      res.status(200).json({
+        success: true,
+        data: categorias,
       });
     } catch (err) {
       next(err);
@@ -67,9 +83,9 @@ export class ProductoController {
     try {
       const userId = req.user!.id;
       const { id } = req.params;
-      const { nombre, precio_unitario } = req.body;
+      const { nombre, precio_unitario, categoria, codigo } = req.body;
 
-      const producto = await ProductoService.actualizar(userId, id, { nombre, precio_unitario });
+      const producto = await ProductoService.actualizar(userId, id, { nombre, precio_unitario, categoria, codigo });
 
       res.status(200).json({
         success: true,

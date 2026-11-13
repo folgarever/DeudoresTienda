@@ -10,5 +10,6 @@ router.use(authenticateToken);
 router.get('/', AbonoController.listar);
 router.post('/', AbonoController.registrar);
 router.get('/:id', AbonoController.obtenerPorId);
+router.post('/:id/anular', AbonoController.anular);
 
 export default router;

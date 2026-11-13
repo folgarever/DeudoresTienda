@@ -23,8 +23,10 @@ export class ClienteController {
   static async listar(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
-      const { search, soloConDeuda, incluirInactivos } = req.query;
+      const { search, soloConDeuda, incluirInactivos, orden } = req.query;
       const paginacion = parsePaginacion(req, 100, 500);
+
+      const ordenValido = orden === 'saldo' || orden === 'reciente' || orden === 'nombre' ? orden : undefined;
 
       const resultado = await ClienteService.listar(
         userId,
@@ -32,6 +34,7 @@ export class ClienteController {
           search: search ? String(search) : undefined,
           soloConDeuda: soloConDeuda === 'true' || soloConDeuda === '1',
           incluirInactivos: incluirInactivos === 'true' || incluirInactivos === '1',
+          orden: ordenValido,
         },
         paginacion
       );

@@ -9,6 +9,7 @@ router.use(authenticateToken);
 
 router.get('/', ProductoController.listar);
 router.post('/', ProductoController.crear);
+router.get('/categorias', ProductoController.listarCategorias);
 router.get('/:id', ProductoController.obtenerPorId);
 router.put('/:id', ProductoController.actualizar);
 router.patch('/:id/reactivar', ProductoController.reactivar);

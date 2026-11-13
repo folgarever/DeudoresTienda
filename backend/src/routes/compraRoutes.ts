@@ -10,5 +10,6 @@ router.use(authenticateToken);
 router.get('/', CompraController.listar);
 router.post('/', CompraController.registrar);
 router.get('/:id', CompraController.obtenerPorId);
+router.post('/:id/anular', CompraController.anular);
 
 export default router;

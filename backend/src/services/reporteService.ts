@@ -46,11 +46,12 @@ export class ReporteService {
     const desdeISO = desde.toISOString();
     const hastaISO = hasta.toISOString();
 
-    // 1. Compras del rango
+    // 1. Compras del rango (excluyendo anuladas)
     const { data: compras, error: errCompras } = await supabase
       .from('compras')
       .select('total, fecha_compra')
       .eq('user_id', userId)
+      .eq('anulada', false)
       .gte('fecha_compra', desdeISO)
       .lte('fecha_compra', hastaISO);
 
@@ -58,11 +59,12 @@ export class ReporteService {
       throw createReporteError('Error al consultar compras: ' + errCompras.message, 500);
     }
 
-    // 2. Abonos del rango
+    // 2. Abonos del rango (excluyendo anulados)
     const { data: abonos, error: errAbonos } = await supabase
       .from('abonos_pagos')
       .select('monto, fecha_pago')
       .eq('user_id', userId)
+      .eq('anulado', false)
       .gte('fecha_pago', desdeISO)
       .lte('fecha_pago', hastaISO);
 

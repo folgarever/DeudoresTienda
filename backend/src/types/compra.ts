@@ -26,6 +26,9 @@ export interface Compra {
   total: number;
   estado_pago: 'PENDIENTE' | 'PARCIAL' | 'PAGADO';
   saldo_generado: number;
+  anulada?: boolean;
+  anulada_at?: string | null;
+  motivo_anulacion?: string | null;
   fecha_compra: string;
   created_at?: string;
   cliente?: {

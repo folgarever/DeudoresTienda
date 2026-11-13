@@ -28,14 +28,19 @@ export class AbonoController {
   static async listar(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
-      const { cliente_id, limit } = req.query;
+      const { cliente_id, limit, incluirAnulados } = req.query;
       const paginacion = parsePaginacion(req, 50, 200);
+
+      // Por defecto solo se listan abonos vigentes; el historial puede pedir
+      // incluir los anulados para mostrar su estado.
+      const incluir = incluirAnulados === 'true' || incluirAnulados === '1';
 
       const resultado = await AbonoService.listarAbonos(
         userId,
         cliente_id ? String(cliente_id) : undefined,
         limit ? parseInt(String(limit), 10) : 50,
-        paginacion
+        paginacion,
+        !incluir
       );
 
       res.status(200).json({
@@ -59,6 +64,24 @@ export class AbonoController {
 
       res.status(200).json({
         success: true,
+        data: abono,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async anular(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const { id } = req.params;
+      const { motivo } = req.body;
+
+      const abono = await AbonoService.anularAbono(userId, id, motivo);
+
+      res.status(200).json({
+        success: true,
+        message: 'Abono anulado exitosamente',
         data: abono,
       });
     } catch (err) {
