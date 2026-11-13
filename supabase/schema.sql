@@ -121,6 +121,23 @@ CREATE INDEX IF NOT EXISTS idx_movimientos_cliente ON movimientos_financieros(cl
 CREATE INDEX IF NOT EXISTS idx_movimientos_user ON movimientos_financieros(user_id, fecha DESC);
 
 -- -----------------------------------------------------------------------------
+-- 7. TABLA: productos
+-- Catalogo de productos frecuentes de la tienda (con precio sugerido)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS productos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    nombre VARCHAR(150) NOT NULL,
+    precio_unitario NUMERIC(12, 2) NOT NULL DEFAULT 0.00 CHECK (precio_unitario >= 0.00),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_productos_user ON productos(user_id, activo);
+CREATE INDEX IF NOT EXISTS idx_productos_nombre ON productos(user_id, LOWER(nombre));
+
+-- -----------------------------------------------------------------------------
 -- PERMISOS Y POLITICAS DE SEGURIDAD (RLS)
 -- Como la API de Node.js gestiona internamente la autenticacion JWT y el
 -- aislamiento de datos por user_id, se deshabilita RLS en estas tablas.
@@ -131,6 +148,7 @@ ALTER TABLE compras DISABLE ROW LEVEL SECURITY;
 ALTER TABLE detalles_compra DISABLE ROW LEVEL SECURITY;
 ALTER TABLE abonos_pagos DISABLE ROW LEVEL SECURITY;
 ALTER TABLE movimientos_financieros DISABLE ROW LEVEL SECURITY;
+ALTER TABLE productos DISABLE ROW LEVEL SECURITY;
 
 -- =============================================================================
 -- FUNCIONES TRANSACCIONALES RPC (Integridad Absoluta)

@@ -1,14 +1,17 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HistorialService } from '../../services/historial.service';
 import { CompraService } from '../../services/compra.service';
 import { Compra, ResumenHistorialCliente } from '../../models';
+import { dentroDeRango, fechaCorta, hoyInput, primerDiaMesInput } from '../../core/fecha.utils';
+import { descargarCSV, imprimir } from '../../core/exportar.utils';
 
 @Component({
   selector: 'app-historial',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="container-app">
       <!-- Encabezado con navegación hacia atrás -->
@@ -16,12 +19,22 @@ import { Compra, ResumenHistorialCliente } from '../../models';
         <a routerLink="/clientes" class="back-link">← Volver al listado de clientes</a>
 
         @if (historial(); as h) {
+          <!-- Encabezado visible solo al imprimir (estado de cuenta) -->
+          <div class="print-only print-header">
+            <div class="print-brand">DeudoresTienda</div>
+            <div class="print-title">Estado de Cuenta del Cliente</div>
+            <div class="print-meta">
+              <span><strong>Cliente:</strong> {{ h.cliente.nombre }} {{ h.cliente.apellido }}</span>
+              <span><strong>Emitido:</strong> {{ hoy }}</span>
+            </div>
+          </div>
+
           <div class="flex-between client-header mt-12">
             <div>
               <h1 class="page-title">{{ h.cliente.nombre }} {{ h.cliente.apellido }}</h1>
               <p class="text-muted">Historial financiero y cuenta corriente individual</p>
             </div>
-            <div class="client-actions">
+            <div class="client-actions no-print">
               <a [routerLink]="['/ventas/nueva']" [queryParams]="{ clienteId: h.cliente.id }" class="btn-uber btn-uber-secondary">
                 + Nueva Compra
               </a>
@@ -30,6 +43,12 @@ import { Compra, ResumenHistorialCliente } from '../../models';
                   + Registrar Abono
                 </a>
               }
+              <button type="button" class="btn-uber btn-uber-outline" (click)="exportarMovimientos()">
+                Exportar CSV
+              </button>
+              <button type="button" class="btn-uber btn-uber-outline" (click)="imprimirEstadoCuenta()">
+                Imprimir estado de cuenta
+              </button>
             </div>
           </div>
         }
@@ -85,6 +104,26 @@ import { Compra, ResumenHistorialCliente } from '../../models';
           </div>
         </div>
 
+        <!-- Filtro por rango de fechas -->
+        <div class="card-uber filters-bar no-print mt-24">
+          <div class="filter-field">
+            <label class="form-label" for="desde">Desde</label>
+            <input id="desde" type="date" class="form-control" [ngModel]="desde()" (ngModelChange)="desde.set($event)" />
+          </div>
+          <div class="filter-field">
+            <label class="form-label" for="hasta">Hasta</label>
+            <input id="hasta" type="date" class="form-control" [ngModel]="hasta()" (ngModelChange)="hasta.set($event)" />
+          </div>
+          <div class="filter-presets">
+            <button type="button" class="btn-uber btn-sm btn-uber-secondary" (click)="presetMesActual()">Este mes</button>
+            <button type="button" class="btn-uber btn-sm btn-uber-secondary" (click)="presetMesAnterior()">Mes anterior</button>
+            <button type="button" class="btn-uber btn-sm btn-uber-secondary" (click)="limpiarFiltro()">Ver todo</button>
+          </div>
+          <div class="filter-summary text-muted">
+            Mostrando {{ movimientosFiltrados().length }} de {{ historial()?.movimientos?.length || 0 }} movimiento(s)
+          </div>
+        </div>
+
         <!-- Detalle de Compras y Productos Anotados -->
         <div class="section-container mt-32">
           <div class="section-header">
@@ -96,13 +135,13 @@ import { Compra, ResumenHistorialCliente } from '../../models';
             <div class="loading-state">
               <p>Cargando compras del cliente...</p>
             </div>
-          } @else if (compras().length === 0) {
+          } @else if (comprasFiltradas().length === 0) {
             <div class="card-uber empty-card">
-              <p>Este cliente aún no tiene compras registradas.</p>
+              <p>{{ hayFiltro() ? 'No hay compras en el rango de fechas seleccionado.' : 'Este cliente aún no tiene compras registradas.' }}</p>
             </div>
           } @else {
             <div class="compras-list">
-              @for (c of compras(); track c.id) {
+              @for (c of comprasFiltradas(); track c.id) {
                 <div class="card-uber compra-card">
                   <div class="compra-head">
                     <div>
@@ -170,9 +209,9 @@ import { Compra, ResumenHistorialCliente } from '../../models';
             <p class="text-muted">Registro inmutable de compras anotadas y abonos efectuados</p>
           </div>
 
-          @if (h.movimientos.length === 0) {
+          @if (movimientosFiltrados().length === 0) {
             <div class="card-uber empty-card">
-              <p>Este cliente aún no registra movimientos financieros.</p>
+              <p>{{ hayFiltro() ? 'No hay movimientos en el rango de fechas seleccionado.' : 'Este cliente aún no registra movimientos financieros.' }}</p>
             </div>
           } @else {
             <div class="table-container">
@@ -188,7 +227,7 @@ import { Compra, ResumenHistorialCliente } from '../../models';
                   </tr>
                 </thead>
                 <tbody>
-                  @for (m of h.movimientos; track m.id) {
+                  @for (m of movimientosFiltrados(); track m.id) {
                     <tr>
                       <td class="font-mono text-muted" style="font-size: 13px;">
                         {{ m.fecha | date:'dd/MM/yyyy HH:mm' }}
@@ -357,6 +396,58 @@ import { Compra, ResumenHistorialCliente } from '../../models';
       padding: 32px;
     }
 
+    .filters-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 16px 20px;
+    }
+
+    .filter-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 160px;
+    }
+
+    .filter-presets {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-summary {
+      margin-left: auto;
+      font-size: 13px;
+      align-self: center;
+    }
+
+    .print-header {
+      margin-bottom: 18px;
+      border-bottom: 2px solid #000000;
+      padding-bottom: 10px;
+    }
+
+    .print-brand {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .print-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 4px 0 6px;
+    }
+
+    .print-meta {
+      display: flex;
+      gap: 24px;
+      font-size: 13px;
+    }
+
     .loading-state {
       padding: 48px;
       text-align: center;
@@ -389,6 +480,22 @@ export class HistorialComponent implements OnInit {
   compras = signal<Compra[]>([]);
   cargandoCompras = signal<boolean>(true);
 
+  desde = signal<string>('');
+  hasta = signal<string>('');
+  hoy = fechaCorta(new Date().toISOString());
+
+  hayFiltro = computed<boolean>(() => !!this.desde() || !!this.hasta());
+
+  movimientosFiltrados = computed(() => {
+    const h = this.historial();
+    if (!h) return [];
+    return h.movimientos.filter((m) => dentroDeRango(m.fecha, this.desde(), this.hasta()));
+  });
+
+  comprasFiltradas = computed(() =>
+    this.compras().filter((c) => dentroDeRango(c.fecha_compra, this.desde(), this.hasta()))
+  );
+
   ngOnInit(): void {
     this.route.params.subscribe((params) => {
       const clienteId = params['id'];
@@ -397,6 +504,58 @@ export class HistorialComponent implements OnInit {
         this.cargarCompras(clienteId);
       }
     });
+  }
+
+  limpiarFiltro(): void {
+    this.desde.set('');
+    this.hasta.set('');
+  }
+
+  presetMesActual(): void {
+    this.desde.set(primerDiaMesInput());
+    this.hasta.set(hoyInput());
+  }
+
+  presetMesAnterior(): void {
+    const d = new Date();
+    const inicio = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    const fin = new Date(d.getFullYear(), d.getMonth(), 0);
+    const fmt = (x: Date) =>
+      `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    this.desde.set(fmt(inicio));
+    this.hasta.set(fmt(fin));
+  }
+
+  private nombreArchivoCliente(): string {
+    const h = this.historial();
+    if (!h) return 'cliente';
+    return `${h.cliente.nombre} ${h.cliente.apellido}`.trim().replace(/\s+/g, '_');
+  }
+
+  exportarMovimientos(): void {
+    const movimientos = this.movimientosFiltrados();
+    if (movimientos.length === 0) {
+      return;
+    }
+
+    const filas = movimientos.map((m) => [
+      fechaCorta(m.fecha),
+      m.tipo,
+      m.descripcion,
+      m.monto.toFixed(2),
+      m.saldo_anterior.toFixed(2),
+      m.saldo_posterior.toFixed(2),
+    ]);
+
+    descargarCSV(
+      `historial_${this.nombreArchivoCliente()}`,
+      ['Fecha', 'Tipo', 'Descripcion', 'Monto', 'Saldo anterior', 'Saldo resultante'],
+      filas
+    );
+  }
+
+  imprimirEstadoCuenta(): void {
+    imprimir();
   }
 
   cargarCompras(clienteId: string): void {

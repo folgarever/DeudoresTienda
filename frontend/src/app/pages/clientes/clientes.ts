@@ -1,9 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { ClienteService } from '../../services/cliente.service';
 import { Cliente } from '../../models';
+import { descargarCSV } from '../../core/exportar.utils';
 
 @Component({
   selector: 'app-clientes',
@@ -17,9 +18,14 @@ import { Cliente } from '../../models';
           <h1 class="page-title">Clientes</h1>
           <p class="text-muted">Directorio de clientes y saldos pendientes</p>
         </div>
-        <button class="btn-uber" (click)="abrirModalCrear()">
-          + Nuevo Cliente
-        </button>
+        <div class="header-actions">
+          <button class="btn-uber btn-uber-outline" (click)="exportarClientes()">
+            Exportar CSV
+          </button>
+          <button class="btn-uber" (click)="abrirModalCrear()">
+            + Nuevo Cliente
+          </button>
+        </div>
       </div>
 
       <!-- Barra de Filtros y Búsqueda -->
@@ -143,6 +149,22 @@ import { Cliente } from '../../models';
             </tbody>
           </table>
         </div>
+
+        <!-- Controles de Paginación -->
+        <div class="pagination-bar">
+          <span class="text-muted pagination-info">
+            Mostrando {{ rangoInicio() }}–{{ rangoFin() }} de {{ total() }} cliente(s)
+          </span>
+          <div class="pagination-controls">
+            <button class="btn-uber btn-sm btn-uber-secondary" [disabled]="pagina() <= 1" (click)="irPagina(pagina() - 1)">
+              ← Anterior
+            </button>
+            <span class="page-indicator">Página {{ pagina() }} de {{ totalPaginas() }}</span>
+            <button class="btn-uber btn-sm btn-uber-secondary" [disabled]="pagina() >= totalPaginas()" (click)="irPagina(pagina() + 1)">
+              Siguiente →
+            </button>
+          </div>
+        </div>
       }
 
       <!-- Modal para Crear / Editar Cliente -->
@@ -205,6 +227,32 @@ import { Cliente } from '../../models';
   styles: [`
     .header-section {
       margin-bottom: 24px;
+    }
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .pagination-info {
+      font-size: 13px;
+    }
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .page-indicator {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
     }
     .page-title {
       font-size: 28px;
@@ -338,6 +386,13 @@ export class ClientesComponent implements OnInit {
   soloConDeuda = false;
   incluirInactivos = false;
 
+  pagina = signal(1);
+  limite = signal(20);
+  total = signal(0);
+  totalPaginas = computed(() => Math.max(1, Math.ceil(this.total() / this.limite())));
+  rangoInicio = computed(() => (this.total() === 0 ? 0 : (this.pagina() - 1) * this.limite() + 1));
+  rangoFin = computed(() => Math.min(this.pagina() * this.limite(), this.total()));
+
   mostrarModal = signal<boolean>(false);
   clienteEnEdicion = signal<Cliente | null>(null);
   formNombre = '';
@@ -360,20 +415,61 @@ export class ClientesComponent implements OnInit {
     this.cargando.set(true);
     this.errorMensaje.set(null);
 
-    this.clienteService.listar(this.terminoBusqueda, this.soloConDeuda, this.incluirInactivos).subscribe({
-      next: (res) => {
-        this.cargando.set(false);
-        this.clientes.set(res.data || []);
-      },
-      error: (err) => {
-        this.cargando.set(false);
-        this.errorMensaje.set(err.error?.message || 'Error al cargar clientes');
-      }
-    });
+    this.clienteService
+      .listar(this.terminoBusqueda, this.soloConDeuda, this.incluirInactivos, this.pagina(), this.limite())
+      .subscribe({
+        next: (res) => {
+          this.cargando.set(false);
+          this.clientes.set(res.data || []);
+          this.total.set(res.total ?? (res.data || []).length);
+        },
+        error: (err) => {
+          this.cargando.set(false);
+          this.errorMensaje.set(err.error?.message || 'Error al cargar clientes');
+        }
+      });
   }
 
   onBuscar(): void {
+    this.pagina.set(1);
     this.cargarClientes();
+  }
+
+  irPagina(p: number): void {
+    if (p < 1 || p > this.totalPaginas()) return;
+    this.pagina.set(p);
+    this.cargarClientes();
+  }
+
+  exportarClientes(): void {
+    // Exporta todos los clientes que cumplen los filtros actuales, sin paginar.
+    this.clienteService.listar(this.terminoBusqueda, this.soloConDeuda, this.incluirInactivos, 1, 500).subscribe({
+      next: (res) => {
+        const lista = res.data || [];
+        if (lista.length === 0) {
+          this.errorMensaje.set('No hay clientes para exportar con los filtros actuales.');
+          return;
+        }
+
+        const filas = lista.map((c) => [
+          c.nombre,
+          c.apellido,
+          `${c.nombre} ${c.apellido}`.trim(),
+          c.saldo_pendiente.toFixed(2),
+          c.saldo_pendiente > 0 ? 'Con deuda' : 'Al dia',
+          c.activo ? 'Activo' : 'Inactivo',
+        ]);
+
+        descargarCSV(
+          'clientes',
+          ['Nombre', 'Apellido', 'Nombre completo', 'Saldo pendiente (Q)', 'Estado deuda', 'Estado'],
+          filas
+        );
+      },
+      error: (err) => {
+        this.errorMensaje.set(err.error?.message || 'Error al exportar clientes');
+      }
+    });
   }
 
   private mostrarExito(mensaje: string): void {

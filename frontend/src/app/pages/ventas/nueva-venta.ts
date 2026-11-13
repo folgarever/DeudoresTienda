@@ -4,7 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { ClienteService } from '../../services/cliente.service';
 import { CompraService } from '../../services/compra.service';
-import { Cliente, ItemCompraDTO } from '../../models';
+import { ProductoService } from '../../services/producto.service';
+import { Cliente, ItemCompraDTO, Producto } from '../../models';
+import { ahoraLocalInput, aISO } from '../../core/fecha.utils';
 
 @Component({
   selector: 'app-nueva-venta',
@@ -46,6 +48,19 @@ import { Cliente, ItemCompraDTO } from '../../models';
                 }
               </select>
             </div>
+
+            <div class="form-group mt-12">
+              <label class="form-label" for="fechaCompra">Fecha y hora de la compra</label>
+              <input
+                id="fechaCompra"
+                type="datetime-local"
+                class="form-control"
+                [(ngModel)]="fechaCompra"
+              />
+              <span class="field-hint text-muted">
+                Déjala con la fecha de hoy, o cámbiala si estás anotando una compra de un día anterior.
+              </span>
+            </div>
           </div>
 
           <!-- 2. Agregar Productos -->
@@ -61,6 +76,25 @@ import { Cliente, ItemCompraDTO } from '../../models';
               Ingresa el nombre o descripción del producto y su precio unitario en Quetzales.
             </p>
 
+            @if (productosCatalogo().length > 0) {
+              <div class="catalogo-box">
+                <div class="catalogo-title text-muted">Productos frecuentes — clic para agregar</div>
+                <div class="catalogo-chips">
+                  @for (p of productosCatalogo(); track p.id) {
+                    <button type="button" class="chip-producto" (click)="agregarProductoCatalogo(p)">
+                      {{ p.nombre }} · Q{{ p.precio_unitario | number:'1.2-2' }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+
+            <datalist id="lista-productos">
+              @for (p of productosCatalogo(); track p.id) {
+                <option [value]="p.nombre"></option>
+              }
+            </datalist>
+
             <div class="items-list">
               @for (item of items(); track $index) {
                 <div class="item-row">
@@ -69,8 +103,10 @@ import { Cliente, ItemCompraDTO } from '../../models';
                     <input
                       type="text"
                       class="form-control"
+                      list="lista-productos"
                       placeholder="Ej. Gaseosa 2L, Azúcar 2lb, etc."
                       [(ngModel)]="item.descripcion"
+                      (change)="onDescripcionChange($index)"
                     />
                   </div>
 
@@ -144,6 +180,11 @@ import { Cliente, ItemCompraDTO } from '../../models';
                 <span>{{ items().length }} producto(s)</span>
               </div>
 
+              <div class="summary-line">
+                <span class="text-muted">Fecha:</span>
+                <span class="font-mono">{{ fechaCompra | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+
               <div class="summary-divider"></div>
 
               <div class="summary-line total-line">
@@ -190,6 +231,13 @@ import { Cliente, ItemCompraDTO } from '../../models';
     .mt-16 { margin-top: 16px; }
     .mt-24 { margin-top: 24px; }
 
+    .field-hint {
+      display: block;
+      font-size: 12px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 340px;
@@ -205,6 +253,42 @@ import { Cliente, ItemCompraDTO } from '../../models';
       display: flex;
       flex-direction: column;
       gap: 12px;
+    }
+
+    .catalogo-box {
+      margin-bottom: 16px;
+    }
+
+    .catalogo-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .catalogo-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip-producto {
+      background-color: var(--color-white);
+      border: 1px solid var(--color-gray-border-dark);
+      border-radius: var(--radius-pill);
+      padding: 6px 14px;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--color-black);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .chip-producto:hover {
+      background-color: var(--color-black);
+      border-color: var(--color-black);
+      color: var(--color-white);
     }
 
     .item-row {
@@ -343,12 +427,17 @@ import { Cliente, ItemCompraDTO } from '../../models';
 export class NuevaVentaComponent implements OnInit {
   private clienteService = inject(ClienteService);
   private compraService = inject(CompraService);
+  private productoService = inject(ProductoService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
   listaClientes = signal<Cliente[]>([]);
   clienteSeleccionadoId = '';
   clienteSeleccionado = signal<Cliente | null>(null);
+
+  productosCatalogo = signal<Producto[]>([]);
+
+  fechaCompra = ahoraLocalInput();
 
   items = signal<ItemCompraDTO[]>([
     { descripcion: '', cantidad: 1, precio_unitario: 0 }
@@ -360,6 +449,47 @@ export class NuevaVentaComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargarClientes();
+    this.cargarCatalogo();
+  }
+
+  cargarCatalogo(): void {
+    this.productoService.listar().subscribe({
+      next: (res) => this.productosCatalogo.set(res.data || []),
+      error: () => this.productosCatalogo.set([])
+    });
+  }
+
+  agregarProductoCatalogo(p: Producto): void {
+    const lista = this.items();
+    const vacio = lista.findIndex((it) => !it.descripcion.trim() && (Number(it.precio_unitario) || 0) === 0);
+
+    if (vacio >= 0) {
+      this.items.update((items) =>
+        items.map((it, i) =>
+          i === vacio ? { ...it, descripcion: p.nombre, precio_unitario: p.precio_unitario } : it
+        )
+      );
+    } else {
+      this.items.update((items) => [
+        ...items,
+        { descripcion: p.nombre, cantidad: 1, precio_unitario: p.precio_unitario }
+      ]);
+    }
+    this.calcularTotal();
+  }
+
+  onDescripcionChange(index: number): void {
+    const item = this.items()[index];
+    if (!item) return;
+
+    const texto = item.descripcion.trim().toLowerCase();
+    const producto = this.productosCatalogo().find((p) => p.nombre.trim().toLowerCase() === texto);
+    if (producto && (!item.precio_unitario || item.precio_unitario === 0)) {
+      this.items.update((items) =>
+        items.map((it, i) => (i === index ? { ...it, precio_unitario: producto.precio_unitario } : it))
+      );
+      this.calcularTotal();
+    }
   }
 
   cargarClientes(): void {
@@ -425,7 +555,8 @@ export class NuevaVentaComponent implements OnInit {
 
     this.compraService.registrar({
       cliente_id: this.clienteSeleccionadoId,
-      items: itemsValidos
+      items: itemsValidos,
+      fecha: aISO(this.fechaCompra)
     }).subscribe({
       next: () => {
         this.guardando.set(false);

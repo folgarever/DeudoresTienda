@@ -9,6 +9,17 @@ function createAbonoError(message: string, statusCode: number = 400): AppError {
   return err;
 }
 
+// Convierte la fecha opcional enviada por el cliente a ISO (UTC).
+// Si el valor recibido no es una fecha valida se rechaza con un error 400.
+function parseFecha(valor?: string): string {
+  if (!valor) return new Date().toISOString();
+  const d = new Date(valor);
+  if (isNaN(d.getTime())) {
+    throw createAbonoError('La fecha del abono no es valida');
+  }
+  return d.toISOString();
+}
+
 function normalizarAbono(a: Record<string, unknown>): AbonoPago {
   return {
     ...(a as unknown as AbonoPago),
@@ -40,7 +51,7 @@ export class AbonoService {
     const clienteId = dto.cliente_id?.trim();
     const monto = Number(dto.monto);
     const observaciones = dto.observaciones?.trim() || null;
-    const fecha = dto.fecha ? new Date(dto.fecha).toISOString() : new Date().toISOString();
+    const fecha = parseFecha(dto.fecha);
 
     if (!clienteId) {
       throw createAbonoError('El cliente es obligatorio para registrar el abono o pago');

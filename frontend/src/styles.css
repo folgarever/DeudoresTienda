@@ -538,3 +538,67 @@ select.form-control {
     scroll-behavior: auto !important;
   }
 }
+
+/* ==========================================================================
+   IMPRESIÓN (ESTADOS DE CUENTA Y REPORTES)
+   ========================================================================== */
+.print-only {
+  display: none;
+}
+
+@media print {
+  body {
+    background-color: #FFFFFF;
+    font-size: 12px;
+  }
+
+  .navbar-uber,
+  .no-print,
+  .back-link,
+  .btn-uber,
+  .btn-remove,
+  button {
+    display: none !important;
+  }
+
+  .container-app {
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .card-uber,
+  .card-uber-light,
+  .table-container {
+    box-shadow: none !important;
+    border-color: #CCCCCC !important;
+    break-inside: avoid;
+  }
+
+  .table-uber th {
+    position: static;
+  }
+
+  .debt-highlight {
+    background-color: #FFFFFF !important;
+    border-color: #CCCCCC !important;
+  }
+
+  .debt-highlight .stat-label,
+  .debt-highlight .stat-meta,
+  .debt-highlight .stat-value {
+    color: #000000 !important;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .section-container {
+    break-inside: avoid;
+  }
+}

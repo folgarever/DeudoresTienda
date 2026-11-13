@@ -5,6 +5,7 @@ import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { ClienteService } from '../../services/cliente.service';
 import { AbonoService } from '../../services/abono.service';
 import { Cliente } from '../../models';
+import { ahoraLocalInput, aISO } from '../../core/fecha.utils';
 
 @Component({
   selector: 'app-nuevo-abono',
@@ -118,6 +119,20 @@ import { Cliente } from '../../models';
               />
             </div>
 
+            <!-- Fecha del abono (retroactiva opcional) -->
+            <div class="form-group mt-16">
+              <label class="form-label" for="fechaAbono">Fecha y hora del abono</label>
+              <input
+                id="fechaAbono"
+                type="datetime-local"
+                class="form-control"
+                [(ngModel)]="fechaAbono"
+              />
+              <span class="field-hint text-muted">
+                Déjala con la fecha de hoy, o cámbiala si estás anotando un pago recibido en un día anterior.
+              </span>
+            </div>
+
             <!-- Botón de Confirmación -->
             <button
               type="button"
@@ -143,6 +158,13 @@ import { Cliente } from '../../models';
     .mt-16 { margin-top: 16px; }
     .mt-24 { margin-top: 24px; }
     .text-center { text-align: center; }
+
+    .field-hint {
+      display: block;
+      font-size: 12px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
 
     .form-wrapper {
       max-width: 540px;
@@ -217,6 +239,7 @@ export class NuevoAbonoComponent implements OnInit {
   montoAbono: number = 0;
   saldoRestante = signal<number>(0);
   observaciones = '';
+  fechaAbono = ahoraLocalInput();
 
   cargando = signal<boolean>(true);
   guardando = signal<boolean>(false);
@@ -300,7 +323,8 @@ export class NuevoAbonoComponent implements OnInit {
     this.abonoService.registrar({
       cliente_id: cl.id,
       monto,
-      observaciones: this.observaciones.trim() || undefined
+      observaciones: this.observaciones.trim() || undefined,
+      fecha: aISO(this.fechaAbono)
     }).subscribe({
       next: () => {
         this.guardando.set(false);
