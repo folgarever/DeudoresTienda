@@ -11,13 +11,24 @@ export class ClienteService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/clientes`;
 
-  listar(search?: string, soloConDeuda?: boolean, incluirInactivos?: boolean): Observable<{ success: boolean; total: number; data: Cliente[] }> {
+  listar(
+    search?: string,
+    soloConDeuda?: boolean,
+    incluirInactivos?: boolean,
+    page?: number,
+    limit?: number
+  ): Observable<{ success: boolean; total: number; page?: number; limit?: number; data: Cliente[] }> {
     let params = new HttpParams();
     if (search) params = params.set('search', search);
     if (soloConDeuda) params = params.set('soloConDeuda', 'true');
     if (incluirInactivos) params = params.set('incluirInactivos', 'true');
+    if (page !== undefined) params = params.set('page', page.toString());
+    if (limit !== undefined) params = params.set('limit', limit.toString());
 
-    return this.http.get<{ success: boolean; total: number; data: Cliente[] }>(this.apiUrl, { params });
+    return this.http.get<{ success: boolean; total: number; page?: number; limit?: number; data: Cliente[] }>(
+      this.apiUrl,
+      { params }
+    );
   }
 
   obtenerPorId(id: string): Observable<{ success: boolean; data: Cliente }> {
