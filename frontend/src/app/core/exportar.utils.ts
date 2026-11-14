@@ -19,9 +19,24 @@ function normalizar(valor: FilaPDF[number]): string {
   return valor === null || valor === undefined ? '' : String(valor);
 }
 
+// Precarga el logo de la app para incrustarlo en los PDF. Si falla, devuelve null
+// y el documento se genera igualmente sin el logo.
+function cargarLogo(): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = 'logo.png';
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 // Genera y descarga un PDF con una tabla a partir de los datos indicados.
 // Mantiene la identidad monocromatica: encabezado negro y filas alternadas.
-export function descargarPDF(opciones: OpcionesPDF): void {
+export async function descargarPDF(opciones: OpcionesPDF): Promise<void> {
   const { titulo, subtitulo, nombreArchivo, encabezados, filas, alineaciones } = opciones;
 
   const doc = new jsPDF({
@@ -32,6 +47,17 @@ export function descargarPDF(opciones: OpcionesPDF): void {
 
   const margen = 40;
   const anchoPagina = doc.internal.pageSize.getWidth();
+
+  // Logo de la app en la esquina superior derecha (solo en la primera hoja).
+  const logo = await cargarLogo();
+  if (logo) {
+    const tamanoLogo = 34;
+    try {
+      doc.addImage(logo, 'PNG', anchoPagina - margen - tamanoLogo, 20, tamanoLogo, tamanoLogo);
+    } catch {
+      // Si el logo no se puede incrustar, se omite sin afectar al documento.
+    }
+  }
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);

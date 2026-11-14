@@ -32,18 +32,15 @@
   opacity: 0.85;
 }
 
-.brand-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+.brand-logo {
+  display: block;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 9px;
+  object-fit: cover;
   background-color: #FFFFFF;
-  color: #000000;
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: -0.04em;
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .brand-text {

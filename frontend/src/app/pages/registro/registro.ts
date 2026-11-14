@@ -10,128 +10,242 @@ import { AuthService } from '../../core/auth.service';
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="auth-wrapper">
-      <div class="auth-card">
-        <div class="auth-brand">
-          <span class="brand-mark">D</span>
+      <aside class="auth-aside">
+        <div class="auth-aside-inner">
+          <div class="auth-logo-tile">
+            <img src="logo.png" alt="DeudoresTienda">
+          </div>
+          <h2 class="auth-aside-title">DeudoresTienda</h2>
+          <p class="auth-aside-text">Crea tu cuenta y empieza a administrar tu tienda hoy mismo.</p>
+          <ul class="auth-features">
+            <li>
+              <span class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+              Registro en menos de un minuto
+            </li>
+            <li>
+              <span class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+              Administra todos tus clientes
+            </li>
+            <li>
+              <span class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+              Exporta estados de cuenta en PDF
+            </li>
+          </ul>
         </div>
+      </aside>
 
-        <div class="auth-header">
-          <h1 class="auth-title">Crea tu cuenta</h1>
-          <p class="auth-subtitle">Registra tu tienda para administrar clientes y deudas</p>
+      <main class="auth-main">
+        <div class="auth-card">
+          <div class="auth-brand">
+            <img class="auth-logo" src="logo.png" alt="DeudoresTienda">
+          </div>
+
+          <div class="auth-header">
+            <h1 class="auth-title">Crea tu cuenta</h1>
+            <p class="auth-subtitle">Registra tu tienda para administrar clientes y deudas</p>
+          </div>
+
+          @if (errorMensaje()) {
+            <div class="alert-uber alert-uber-error">
+              {{ errorMensaje() }}
+            </div>
+          }
+
+          <form (ngSubmit)="onSubmit()" class="auth-form">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label class="form-label" for="nombres">Nombres</label>
+                <input
+                  id="nombres"
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="nombres"
+                  name="nombres"
+                  placeholder="Ej. Ana María"
+                  autocomplete="given-name"
+                  required
+                />
+              </div>
+
+              <div class="form-group flex-1">
+                <label class="form-label" for="apellidos">Apellidos</label>
+                <input
+                  id="apellidos"
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="apellidos"
+                  name="apellidos"
+                  placeholder="Ej. Gómez Pérez"
+                  autocomplete="family-name"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="email">Correo electrónico</label>
+              <div class="input-wrap">
+                <svg class="input-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+                <input
+                  id="email"
+                  type="email"
+                  class="form-control has-icon"
+                  [(ngModel)]="email"
+                  name="email"
+                  placeholder="tu_correo@tienda.com"
+                  autocomplete="email"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="username">Nombre de usuario</label>
+              <div class="input-wrap">
+                <svg class="input-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>
+                <input
+                  id="username"
+                  type="text"
+                  class="form-control has-icon"
+                  [(ngModel)]="username"
+                  name="username"
+                  placeholder="usuario_tienda"
+                  autocomplete="username"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="password">Contraseña (mínimo 6 caracteres)</label>
+              <div class="input-wrap">
+                <svg class="input-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input
+                  id="password"
+                  type="password"
+                  class="form-control has-icon"
+                  [(ngModel)]="password"
+                  name="password"
+                  placeholder="••••••••"
+                  autocomplete="new-password"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              class="btn-uber btn-block"
+              [disabled]="cargando()"
+            >
+              {{ cargando() ? 'Creando cuenta...' : 'Crear cuenta' }}
+            </button>
+          </form>
+
+          <div class="auth-footer">
+            <p>¿Ya tienes cuenta? <a routerLink="/login" class="auth-link">Inicia sesión</a></p>
+          </div>
         </div>
-
-        @if (errorMensaje()) {
-          <div class="alert-uber alert-uber-error">
-            {{ errorMensaje() }}
-          </div>
-        }
-
-        <form (ngSubmit)="onSubmit()" class="auth-form">
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label class="form-label" for="nombres">Nombres</label>
-              <input
-                id="nombres"
-                type="text"
-                class="form-control"
-                [(ngModel)]="nombres"
-                name="nombres"
-                placeholder="Ej. Ana María"
-                autocomplete="given-name"
-                required
-              />
-            </div>
-
-            <div class="form-group flex-1">
-              <label class="form-label" for="apellidos">Apellidos</label>
-              <input
-                id="apellidos"
-                type="text"
-                class="form-control"
-                [(ngModel)]="apellidos"
-                name="apellidos"
-                placeholder="Ej. Gómez Pérez"
-                autocomplete="family-name"
-                required
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="email">Correo electrónico</label>
-            <div class="input-wrap">
-              <svg class="input-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
-              <input
-                id="email"
-                type="email"
-                class="form-control has-icon"
-                [(ngModel)]="email"
-                name="email"
-                placeholder="tu_correo@tienda.com"
-                autocomplete="email"
-                required
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="username">Nombre de usuario</label>
-            <div class="input-wrap">
-              <svg class="input-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>
-              <input
-                id="username"
-                type="text"
-                class="form-control has-icon"
-                [(ngModel)]="username"
-                name="username"
-                placeholder="usuario_tienda"
-                autocomplete="username"
-                required
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="password">Contraseña (mínimo 6 caracteres)</label>
-            <div class="input-wrap">
-              <svg class="input-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              <input
-                id="password"
-                type="password"
-                class="form-control has-icon"
-                [(ngModel)]="password"
-                name="password"
-                placeholder="••••••••"
-                autocomplete="new-password"
-                required
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            class="btn-uber btn-block"
-            [disabled]="cargando()"
-          >
-            {{ cargando() ? 'Creando cuenta...' : 'Crear cuenta' }}
-          </button>
-        </form>
-
-        <div class="auth-footer">
-          <p>¿Ya tienes cuenta? <a routerLink="/login" class="auth-link">Inicia sesión</a></p>
-        </div>
-      </div>
+      </main>
     </div>
   `,
   styles: [`
+    :host { display: block; }
+
     .auth-wrapper {
+      display: flex;
+      width: 100%;
       min-height: calc(100vh - 66px);
+      min-height: calc(100dvh - 66px);
+    }
+
+    /* Panel de marca (solo escritorio/tablet ancha) */
+    .auth-aside {
+      flex: 1 1 46%;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 40px 16px;
+      padding: clamp(28px, 4vw, 56px);
+      color: #FFFFFF;
       background:
-        radial-gradient(1100px 460px at 50% -8%, #FFFFFF 0%, rgba(255,255,255,0) 62%),
+        radial-gradient(700px 520px at 18% 8%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 62%),
+        #0B0B0D;
+      overflow: hidden;
+    }
+    .auth-aside-inner {
+      width: 100%;
+      max-width: 420px;
+      animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .auth-logo-tile {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: clamp(72px, 8vw, 88px);
+      height: clamp(72px, 8vw, 88px);
+      padding: 12px;
+      border-radius: 22px;
+      background-color: #FFFFFF;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+      margin-bottom: 26px;
+    }
+    .auth-logo-tile img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: 12px;
+      object-fit: cover;
+    }
+    .auth-aside-title {
+      color: #FFFFFF;
+      font-size: clamp(24px, 2.4vw, 30px);
+      letter-spacing: -0.03em;
+      margin-bottom: 10px;
+    }
+    .auth-aside-text {
+      color: rgba(255, 255, 255, 0.68);
+      font-size: 15px;
+      margin-bottom: 28px;
+    }
+    .auth-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .auth-features li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 14.5px;
+    }
+    .feat-ico {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      flex: none;
+      border-radius: 999px;
+      background-color: rgba(255, 255, 255, 0.10);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #FFFFFF;
+    }
+    .feat-ico svg {
+      width: 13px;
+      height: 13px;
+    }
+
+    /* Panel del formulario */
+    .auth-main {
+      flex: 1 1 54%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(24px, 4vw, 56px) clamp(16px, 3vw, 48px);
+      background:
+        radial-gradient(1100px 460px at 50% -8%, var(--color-surface) 0%, rgba(255, 255, 255, 0) 62%),
         var(--color-bg);
     }
     .auth-card {
@@ -141,33 +255,31 @@ import { AuthService } from '../../core/auth.service';
       border: 1px solid var(--color-gray-border);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow-lg);
-      padding: 36px;
+      padding: clamp(24px, 4vw, 36px);
       animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
+
+    /* Logo dentro de la tarjeta: visible solo cuando se oculta el panel lateral */
     .auth-brand {
-      display: flex;
+      display: none;
       justify-content: center;
       margin-bottom: 20px;
     }
-    .brand-mark {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 46px;
-      height: 46px;
-      border-radius: 13px;
-      background-color: var(--color-black);
-      color: var(--color-white);
-      font-weight: 800;
-      font-size: 24px;
-      letter-spacing: -0.04em;
+    .auth-logo {
+      width: clamp(64px, 16vw, 76px);
+      height: clamp(64px, 16vw, 76px);
+      border-radius: 18px;
+      object-fit: cover;
+      border: 1px solid var(--color-gray-border);
+      box-shadow: var(--shadow-sm);
     }
+
     .auth-header {
       margin-bottom: 26px;
       text-align: center;
     }
     .auth-title {
-      font-size: 25px;
+      font-size: clamp(22px, 3vw, 25px);
       margin-bottom: 6px;
     }
     .auth-subtitle {
@@ -214,9 +326,19 @@ import { AuthService } from '../../core/auth.service';
       font-weight: 600;
       text-decoration: underline;
     }
+
+    /* Adaptabilidad: en pantallas angostas se oculta el panel lateral */
+    @media (max-width: 900px) {
+      .auth-aside {
+        display: none;
+      }
+      .auth-brand {
+        display: flex;
+      }
+    }
     @media (max-width: 480px) {
       .auth-card {
-        padding: 26px 20px;
+        padding: 24px 18px;
       }
       .form-row {
         flex-direction: column;
