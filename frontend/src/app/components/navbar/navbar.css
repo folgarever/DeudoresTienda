@@ -10,9 +10,9 @@
 }
 
 .navbar-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  width: 100%;
+  margin: 0;
+  padding: 0 clamp(16px, 2.2vw, 44px);
   height: 66px;
   display: flex;
   align-items: center;
