@@ -6,21 +6,34 @@
       <span class="brand-text">DeudoresTienda</span>
     </a>
 
-    <!-- Boton de tema (visible cuando no hay sesion) -->
+    <!-- Acciones cuando no hay sesion -->
     @if (!authService.isAuthenticated()) {
-      <button
-        type="button"
-        class="theme-toggle theme-toggle-solo"
-        (click)="toggleTema()"
-        [attr.aria-label]="themeService.tema() === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'"
-        [title]="themeService.tema() === 'dark' ? 'Modo claro' : 'Modo oscuro'"
-      >
-        @if (themeService.tema() === 'dark') {
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-        } @else {
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <div class="nav-actions-solo">
+        @if (pwaService.mostrarInstalar()) {
+          <button
+            type="button"
+            class="install-btn install-btn-solo"
+            (click)="instalarApp()"
+            title="Instalar la aplicación"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+            <span>Instalar app</span>
+          </button>
         }
-      </button>
+        <button
+          type="button"
+          class="theme-toggle theme-toggle-solo"
+          (click)="toggleTema()"
+          [attr.aria-label]="themeService.tema() === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro'"
+          [title]="themeService.tema() === 'dark' ? 'Modo claro' : 'Modo oscuro'"
+        >
+          @if (themeService.tema() === 'dark') {
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          } @else {
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          }
+        </button>
+      </div>
     }
 
     <!-- Boton Hamburguesa para Movil -->
@@ -71,6 +84,17 @@
               </span>
             </a>
           }
+          @if (pwaService.mostrarInstalar()) {
+            <button
+              type="button"
+              class="install-btn"
+              (click)="instalarApp()"
+              title="Instalar la aplicación"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+              <span class="install-btn-text">Instalar app</span>
+            </button>
+          }
           <button
             type="button"
             class="theme-toggle"
@@ -97,3 +121,20 @@
     }
   </div>
 </nav>
+
+<!-- Instrucciones de instalacion para iPhone / iPad (Safari) -->
+@if (mostrarInstrucciones) {
+  <div class="pwa-overlay" (click)="cerrarInstrucciones()">
+    <div class="pwa-modal" role="dialog" aria-modal="true" aria-label="Cómo instalar la aplicación" (click)="$event.stopPropagation()">
+      <h3 class="pwa-modal-title">Instalar DeudoresTienda</h3>
+      <p class="pwa-modal-text">Para instalarla en tu iPhone o iPad:</p>
+      <ol class="pwa-steps">
+        <li>Toca el botón <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba).</li>
+        <li>Elige <strong>«Añadir a pantalla de inicio»</strong>.</li>
+        <li>Confirma tocando <strong>«Agregar»</strong>.</li>
+      </ol>
+      <p class="pwa-modal-note">El ícono de DeudoresTienda aparecerá en tu pantalla de inicio, como cualquier otra app.</p>
+      <button type="button" class="btn-uber pwa-modal-close" (click)="cerrarInstrucciones()">Entendido</button>
+    </div>
+  </div>
+}

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { ThemeService } from '../../core/theme.service';
+import { PwaService } from '../../core/pwa.service';
 
 @Component({
   selector: 'app-navbar',
@@ -14,7 +15,9 @@ import { ThemeService } from '../../core/theme.service';
 export class NavbarComponent {
   authService = inject(AuthService);
   themeService = inject(ThemeService);
+  pwaService = inject(PwaService);
   menuOpen = false;
+  mostrarInstrucciones = false;
 
   initials(): string {
     const user = this.authService.currentUser();
@@ -35,6 +38,20 @@ export class NavbarComponent {
 
   toggleTema(): void {
     this.themeService.toggle();
+  }
+
+  // Instala la app: abre el dialogo del navegador o muestra las instrucciones
+  // de iOS cuando el prompt nativo no esta disponible.
+  async instalarApp(): Promise<void> {
+    const modo = await this.pwaService.instalar();
+    if (modo === 'ios') {
+      this.mostrarInstrucciones = true;
+    }
+    this.closeMenu();
+  }
+
+  cerrarInstrucciones(): void {
+    this.mostrarInstrucciones = false;
   }
 
   logout(): void {
