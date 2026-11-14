@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
     nombre VARCHAR(100) NOT NULL,
     apellido VARCHAR(100) NOT NULL,
+    notas TEXT,
     saldo_pendiente NUMERIC(12, 2) NOT NULL DEFAULT 0.00 CHECK (saldo_pendiente >= 0.00),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -171,6 +172,9 @@ ALTER TABLE productos DISABLE ROW LEVEL SECURITY;
 -- Permiten actualizar una base de datos ya creada sin perder informacion.
 -- Son idempotentes (IF NOT EXISTS), por lo que es seguro volver a ejecutarlas.
 -- =============================================================================
+
+-- Clientes: notas / observaciones libres de la administradora
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS notas TEXT;
 
 -- Productos: categoria y codigo de barras
 -- (las columnas ya se aseguran arriba, antes de crear sus indices)

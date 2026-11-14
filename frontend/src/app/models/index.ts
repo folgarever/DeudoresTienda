@@ -18,6 +18,7 @@ export interface Cliente {
   user_id: string;
   nombre: string;
   apellido: string;
+  notas?: string | null;
   saldo_pendiente: number;
   activo: boolean;
   ultimo_abono?: string | null;

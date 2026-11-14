@@ -3,6 +3,7 @@ export interface Cliente {
   user_id: string;
   nombre: string;
   apellido: string;
+  notas?: string | null;
   saldo_pendiente: number;
   activo: boolean;
   // Campos calculados que solo se incluyen en el listado de clientes.
@@ -15,11 +16,13 @@ export interface Cliente {
 export interface CrearClienteDTO {
   nombre: string;
   apellido: string;
+  notas?: string;
 }
 
 export interface ActualizarClienteDTO {
   nombre: string;
   apellido: string;
+  notas?: string;
 }
 
 // Criterios de ordenamiento disponibles para el listado de clientes.
