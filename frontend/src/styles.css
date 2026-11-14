@@ -629,12 +629,6 @@ body.theme-dark .paid-off {
   color: var(--color-black) !important;
 }
 
-body.theme-dark .auth-wrapper {
-  background:
-    radial-gradient(1100px 460px at 50% -8%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 62%),
-    var(--color-bg) !important;
-}
-
 /* ==========================================================================
    IMPRESIÓN (ESTADOS DE CUENTA Y REPORTES)
    ========================================================================== */
@@ -685,8 +679,8 @@ body.theme-dark .auth-wrapper {
     color: #FFFFFF !important;
   }
 
-  body.theme-dark .auth-wrapper {
-    background: none !important;
+  .auth-aside {
+    display: none !important;
   }
 
   .navbar-uber,

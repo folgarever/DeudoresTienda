@@ -19,7 +19,7 @@ Aplicación web profesional para la administración de clientes, cuentas por cob
 - **Modo Oscuro:** Tema claro/oscuro conmutable desde la barra de navegación, con preferencia persistida en el navegador y aplicación sin parpadeo. La impresión siempre usa la paleta clara.
 - **Perfil de Usuario:** Edición de nombres y apellidos, además de cambio de contraseña autenticado.
 - **Seguridad:** Tokens JWT, contraseñas cifradas con `bcrypt`, limitador de intentos de autenticación, saneamiento de filtros de búsqueda, CORS configurable y ocultamiento de errores internos en producción.
-- **Diseño Monocromático Inspirado en Uber:** Paleta blanco/negro/gris (`#000000`, `#FFFFFF`, `#F6F6F6`, `#333333`), tipografía Inter, bordes de 8px y adaptabilidad móvil total.
+- **Diseño Monocromático Inspirado en Uber:** Paleta blanco/negro/gris (`#000000`, `#FFFFFF`, `#F6F6F6`, `#333333`), tipografía Inter, bordes de 8px y adaptabilidad total a móvil, tablet y escritorio. El logo de la marca (`frontend/public/logo.png`) se usa en la barra de navegación, en las pantallas de acceso (login y registro, a pantalla completa) y como favicon, y también se incrusta en las exportaciones PDF.
 
 ---
 
