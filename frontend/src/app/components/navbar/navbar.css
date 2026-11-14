@@ -192,6 +192,90 @@
   border-color: #FFFFFF;
 }
 
+/* Boton instalar app */
+.install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background-color: #FFFFFF;
+  color: #000000;
+  border: 1px solid #FFFFFF;
+  border-radius: 8px;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.16s ease-in-out;
+}
+
+.install-btn:hover {
+  background-color: transparent;
+  color: #FFFFFF;
+}
+
+.nav-actions-solo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Instrucciones de instalacion (iOS) */
+.pwa-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: rgba(0, 0, 0, 0.55);
+}
+
+.pwa-modal {
+  width: 100%;
+  max-width: 420px;
+  background-color: var(--color-surface);
+  color: var(--color-black);
+  border: 1px solid var(--color-gray-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 24px;
+}
+
+.pwa-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.pwa-modal-text {
+  font-size: 14px;
+  color: var(--color-gray-secondary);
+  margin-bottom: 12px;
+}
+
+.pwa-steps {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.pwa-modal-note {
+  font-size: 13px;
+  color: var(--color-gray-secondary);
+  margin-bottom: 18px;
+}
+
+.pwa-modal-close {
+  width: 100%;
+}
+
 /* Adaptabilidad móvil */
 @media (max-width: 900px) {
   .navbar-toggle {
@@ -233,11 +317,24 @@
   .nav-user-section {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
     padding-top: 14px;
     border-top: 1px solid #262626;
   }
 
   .btn-logout span {
     display: inline;
+  }
+}
+
+/* En pantallas muy angostas, el boton de instalar se muestra solo con icono */
+@media (max-width: 520px) {
+  .install-btn-solo {
+    padding: 8px;
+  }
+
+  .install-btn-solo span {
+    display: none;
   }
 }
