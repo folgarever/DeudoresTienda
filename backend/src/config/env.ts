@@ -35,5 +35,9 @@ export const env = {
   JWT_SECRET: jwtSecret || 'deudores_tienda_dev_secret_key_2026',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
   CORS_ORIGINS: corsOrigins,
+  // Permite cerrar el registro publico de nuevas cuentas. Por defecto queda
+  // habilitado para no cambiar el comportamiento; defina REGISTRATION_ENABLED=false
+  // en produccion si la aplicacion es de uso personal y no desea nuevas cuentas.
+  REGISTRATION_ENABLED: process.env.REGISTRATION_ENABLED !== 'false',
   isProduction,
 };

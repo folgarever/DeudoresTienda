@@ -117,7 +117,7 @@ import { AuthService } from '../../core/auth.service';
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="password">Contraseña (mínimo 6 caracteres)</label>
+              <label class="form-label" for="password">Contraseña (mínimo 8 caracteres)</label>
               <div class="input-wrap">
                 <svg class="input-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 <input
@@ -132,6 +132,13 @@ import { AuthService } from '../../core/auth.service';
                 />
               </div>
             </div>
+
+            <p class="auth-legal">
+              Al crear tu cuenta aceptas los
+              <a routerLink="/terminos" class="auth-link">Términos y Condiciones</a>
+              y la
+              <a routerLink="/privacidad" class="auth-link">Política de Privacidad</a>.
+            </p>
 
             <button
               type="submit"
@@ -321,6 +328,15 @@ import { AuthService } from '../../core/auth.service';
       text-align: center;
       font-size: 14px;
     }
+    .auth-legal {
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: var(--color-gray-secondary);
+      margin: 2px 0 14px;
+    }
+    .auth-legal .auth-link {
+      font-weight: 600;
+    }
     .auth-link {
       color: var(--color-black);
       font-weight: 600;
@@ -365,8 +381,8 @@ export class RegistroComponent {
       return;
     }
 
-    if (this.password.length < 6) {
-      this.errorMensaje.set('La contraseña debe tener al menos 6 caracteres.');
+    if (this.password.length < 8) {
+      this.errorMensaje.set('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
 

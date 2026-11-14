@@ -20,7 +20,8 @@ Aplicación web profesional para la administración de clientes, cuentas por cob
 - **Aplicación Instalable (PWA):** Puede instalarse en el teléfono, la tablet o la computadora ("Agregar a la pantalla de inicio") con ícono propio y abrirse como aplicación de pantalla completa. La barra de navegación muestra un botón **"Instalar app"** cuando el navegador lo permite (en iPhone/iPad abre las instrucciones de Safari). Incluye un *service worker* que precarga la interfaz y permite abrirla sin conexión (los datos de la API siempre se consultan en línea).
 - **Modo Oscuro:** Tema claro/oscuro conmutable desde la barra de navegación, con preferencia persistida en el navegador y aplicación sin parpadeo. La impresión siempre usa la paleta clara.
 - **Perfil de Usuario:** Edición de nombres y apellidos, además de cambio de contraseña autenticado.
-- **Seguridad:** Tokens JWT, contraseñas cifradas con `bcrypt`, limitador de intentos de autenticación, saneamiento de filtros de búsqueda, CORS configurable y ocultamiento de errores internos en producción.
+- **Transparencia y cumplimiento:** páginas de **Política de Privacidad** (`/privacidad`) y **Términos y Condiciones** (`/terminos`), un **pie de página** con enlaces a ambos documentos y el correo de contacto (`folgarever19@gmail.com`), y una **página 404 personalizada** para rutas inexistentes. La aplicación **no utiliza cookies**: solo almacenamiento local del navegador.
+- **Seguridad:** Tokens JWT, contraseñas cifradas con `bcrypt` (mínimo 8 caracteres), limitador de intentos de autenticación, saneamiento de filtros de búsqueda, aislamiento de los datos por cuenta de usuario, **cabeceras de seguridad** (`Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`), CORS configurable, registro de nuevas cuentas desactivable (`REGISTRATION_ENABLED`) y ocultamiento de errores internos en producción.
 - **Diseño Monocromático Inspirado en Uber:** Paleta blanco/negro/gris (`#000000`, `#FFFFFF`, `#F6F6F6`, `#333333`), tipografía Inter, bordes de 8px y adaptabilidad total a móvil, tablet y escritorio. El logo de la marca (`frontend/public/logo.png`) se usa en la barra de navegación, en las pantallas de acceso (login y registro, a pantalla completa) y como favicon, y también se incrusta en las exportaciones PDF.
 
 ---
@@ -78,6 +79,7 @@ La aplicación está preparada para funcionar permanentemente en internet sin de
    - `JWT_EXPIRES_IN`: `7d`
    - `CORS_ORIGINS`: Dominios autorizados separados por coma (ej. `https://deudores-tienda.vercel.app`). Si se deja vacío se permite cualquier origen (recomendado sólo en desarrollo).
    - `NODE_ENV`: `production`
+   - `REGISTRATION_ENABLED` *(opcional)*: `false` para impedir el registro público de nuevas cuentas (útil si la aplicación es de uso personal). Por defecto está habilitado.
 5. Hacer clic en **Deploy**.
 6. Vercel compilará automáticamente el frontend en Angular, desplegará la API en Serverless Functions bajo `/api/*` y publicará la aplicación con certificado SSL (HTTPS) gratuito en un dominio `.vercel.app`.
 
@@ -116,6 +118,7 @@ npm run build      # Genera bundle optimizado de produccion
 - **Modo Oscuro:** botón de tema en la barra de navegación (disponible también sin sesión); la preferencia se guarda en el navegador y se aplica sin parpadeo al cargar.
 - **Aplicación Instalable (PWA):** la interfaz incluye `manifest.webmanifest` y un *service worker* (`frontend/public/sw.js`), por lo que puede instalarse como aplicación y abrirse sin conexión (con los datos de la API siempre en línea).
 - **Mi Perfil:** `/perfil` para editar nombres y apellidos y cambiar la contraseña.
+- **Legal y contacto:** `/privacidad` (Política de Privacidad) y `/terminos` (Términos y Condiciones), accesibles desde el pie de página junto con el correo de contacto `folgarever19@gmail.com`. Las rutas inexistentes muestran una página **404** personalizada. La aplicación no utiliza cookies.
 
 ---
 
