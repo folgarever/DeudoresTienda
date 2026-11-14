@@ -26,126 +26,134 @@ import { ahoraLocalInput, aISO } from '../../core/fecha.utils';
       }
 
       <div class="form-wrapper">
-        <div class="card-uber abono-card">
-          <!-- 1. Selección de Cliente -->
-          <div class="form-group">
-            <label class="form-label" for="cliente">Cliente</label>
-            <select
-              id="cliente"
-              class="form-control"
-              [(ngModel)]="clienteSeleccionadoId"
-              (change)="onClienteChange()"
-            >
-              <option value="">-- Selecciona un cliente con deuda --</option>
-              @for (c of clientesConDeuda(); track c.id) {
-                <option [value]="c.id">
-                  {{ c.nombre }} {{ c.apellido }} — Debe: Q{{ c.saldo_pendiente | number:'1.2-2' }}
-                </option>
-              }
-            </select>
+        <div class="abono-layout" [class.has-resumen]="clienteSeleccionado()">
+          <!-- Columna 1: datos del abono -->
+          <div class="card-uber abono-card">
+            <!-- 1. Selección de Cliente -->
+            <div class="form-group">
+              <label class="form-label" for="cliente">Cliente</label>
+              <select
+                id="cliente"
+                class="form-control"
+                [(ngModel)]="clienteSeleccionadoId"
+                (change)="onClienteChange()"
+              >
+                <option value="">-- Selecciona un cliente con deuda --</option>
+                @for (c of clientesConDeuda(); track c.id) {
+                  <option [value]="c.id">
+                    {{ c.nombre }} {{ c.apellido }} — Debe: Q{{ c.saldo_pendiente | number:'1.2-2' }}
+                  </option>
+                }
+              </select>
+            </div>
+
+            @if (clienteSeleccionado(); as cliente) {
+              <!-- 2. Monto a Abonar -->
+              <div class="form-group mt-16">
+                <label class="form-label" for="monto">Cantidad a Abonar (Q)</label>
+                <input
+                  id="monto"
+                  type="number"
+                  step="0.50"
+                  min="0.01"
+                  [max]="cliente.saldo_pendiente"
+                  class="form-control font-mono font-bold"
+                  style="font-size: 18px;"
+                  placeholder="0.00"
+                  [(ngModel)]="montoAbono"
+                  (input)="calcularSaldoRestante()"
+                />
+                @if (montoAbono > cliente.saldo_pendiente) {
+                  <span class="field-error">
+                    El monto ingresado no puede superar el saldo adeudado (Q{{ cliente.saldo_pendiente | number:'1.2-2' }}).
+                  </span>
+                }
+              </div>
+
+              <!-- Observaciones opcionales -->
+              <div class="form-group mt-16">
+                <label class="form-label" for="observaciones">Observaciones (Opcional)</label>
+                <input
+                  id="observaciones"
+                  type="text"
+                  class="form-control"
+                  placeholder="Ej. Pago en efectivo, transferencia, etc."
+                  [(ngModel)]="observaciones"
+                />
+              </div>
+
+              <!-- Fecha del abono (retroactiva opcional) -->
+              <div class="form-group mt-16">
+                <label class="form-label" for="fechaAbono">Fecha y hora del abono</label>
+                <input
+                  id="fechaAbono"
+                  type="datetime-local"
+                  class="form-control"
+                  [(ngModel)]="fechaAbono"
+                />
+                <span class="field-hint text-muted">
+                  Déjala con la fecha de hoy, o cámbiala si estás anotando un pago recibido en un día anterior.
+                </span>
+              </div>
+
+              <!-- Botón de Confirmación -->
+              <button
+                type="button"
+                class="btn-uber btn-block mt-24"
+                [disabled]="guardando() || montoAbono <= 0 || montoAbono > cliente.saldo_pendiente"
+                (click)="guardarAbono()"
+              >
+                {{ guardando() ? 'Registrando pago...' : 'Confirmar y Guardar Abono' }}
+              </button>
+            } @else if (clientesConDeuda().length === 0 && !cargando()) {
+              <div class="card-uber-light text-center mt-16" style="padding: 24px;">
+                <p>No hay clientes con deudas pendientes actualmente.</p>
+              </div>
+            }
           </div>
 
+          <!-- Columna 2: resumen de la deuda -->
           @if (clienteSeleccionado(); as cliente) {
-            <!-- Panel Informativo de Deuda -->
-            <div class="card-uber-light balance-info-box mt-16">
-              <div class="flex-between">
-                <div>
-                  <span class="text-muted" style="font-size: 13px;">Deuda Pendiente Actual:</span>
-                  <div class="current-debt font-mono">Q{{ cliente.saldo_pendiente | number:'1.2-2' }}</div>
+            <aside class="abono-resumen">
+              <!-- Panel Informativo de Deuda -->
+              <div class="card-uber balance-info-box">
+                <div class="flex-between">
+                  <div>
+                    <span class="text-muted" style="font-size: 13px;">Deuda Pendiente Actual:</span>
+                    <div class="current-debt font-mono">Q{{ cliente.saldo_pendiente | number:'1.2-2' }}</div>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-uber btn-sm btn-uber-outline"
+                    (click)="pagarDeudaCompleta()"
+                  >
+                    Pagar Deuda Completa
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  class="btn-uber btn-sm btn-uber-outline"
-                  (click)="pagarDeudaCompleta()"
-                >
-                  Pagar Deuda Completa
-                </button>
               </div>
-            </div>
 
-            <!-- 2. Monto a Abonar -->
-            <div class="form-group mt-16">
-              <label class="form-label" for="monto">Cantidad a Abonar (Q)</label>
-              <input
-                id="monto"
-                type="number"
-                step="0.50"
-                min="0.01"
-                [max]="cliente.saldo_pendiente"
-                class="form-control font-mono font-bold"
-                style="font-size: 18px;"
-                placeholder="0.00"
-                [(ngModel)]="montoAbono"
-                (input)="calcularSaldoRestante()"
-              />
-              @if (montoAbono > cliente.saldo_pendiente) {
-                <span class="field-error">
-                  El monto ingresado no puede superar el saldo adeudado (Q{{ cliente.saldo_pendiente | number:'1.2-2' }}).
-                </span>
-              }
-            </div>
-
-            <!-- Proyección del Saldo Restante -->
-            <div class="projection-box mt-16">
-              <div class="flex-between projection-line">
-                <span class="text-muted">Saldo anterior:</span>
-                <span class="font-mono">Q{{ cliente.saldo_pendiente | number:'1.2-2' }}</span>
+              <!-- Proyección del Saldo Restante -->
+              <div class="projection-box">
+                <div class="flex-between projection-line">
+                  <span class="text-muted">Saldo anterior:</span>
+                  <span class="font-mono">Q{{ cliente.saldo_pendiente | number:'1.2-2' }}</span>
+                </div>
+                <div class="flex-between projection-line">
+                  <span class="text-muted">Abono a descontar:</span>
+                  <span class="font-mono abono-deduct">-Q{{ (montoAbono || 0) | number:'1.2-2' }}</span>
+                </div>
+                <div class="summary-divider"></div>
+                <div class="flex-between projection-line total-projection">
+                  <span class="font-bold">Deuda Restante:</span>
+                  <span class="font-mono font-bold remaining-balance" [class.paid-off]="saldoRestante() === 0">
+                    Q{{ saldoRestante() | number:'1.2-2' }}
+                    @if (saldoRestante() === 0 && montoAbono > 0) {
+                      <span class="badge-uber badge-saldado" style="margin-left: 6px;">¡DEUDA PAGADA!</span>
+                    }
+                  </span>
+                </div>
               </div>
-              <div class="flex-between projection-line">
-                <span class="text-muted">Abono a descontar:</span>
-                <span class="font-mono" style="color: #000000; font-weight: 600;">-Q{{ (montoAbono || 0) | number:'1.2-2' }}</span>
-              </div>
-              <div class="summary-divider"></div>
-              <div class="flex-between projection-line total-projection">
-                <span class="font-bold">Deuda Restante:</span>
-                <span class="font-mono font-bold remaining-balance" [class.paid-off]="saldoRestante() === 0">
-                  Q{{ saldoRestante() | number:'1.2-2' }}
-                  @if (saldoRestante() === 0 && montoAbono > 0) {
-                    <span class="badge-uber badge-saldado" style="margin-left: 6px;">¡DEUDA PAGADA!</span>
-                  }
-                </span>
-              </div>
-            </div>
-
-            <!-- Observaciones opcionales -->
-            <div class="form-group mt-16">
-              <label class="form-label" for="observaciones">Observaciones (Opcional)</label>
-              <input
-                id="observaciones"
-                type="text"
-                class="form-control"
-                placeholder="Ej. Pago en efectivo, transferencia, etc."
-                [(ngModel)]="observaciones"
-              />
-            </div>
-
-            <!-- Fecha del abono (retroactiva opcional) -->
-            <div class="form-group mt-16">
-              <label class="form-label" for="fechaAbono">Fecha y hora del abono</label>
-              <input
-                id="fechaAbono"
-                type="datetime-local"
-                class="form-control"
-                [(ngModel)]="fechaAbono"
-              />
-              <span class="field-hint text-muted">
-                Déjala con la fecha de hoy, o cámbiala si estás anotando un pago recibido en un día anterior.
-              </span>
-            </div>
-
-            <!-- Botón de Confirmación -->
-            <button
-              type="button"
-              class="btn-uber btn-block mt-24"
-              [disabled]="guardando() || montoAbono <= 0 || montoAbono > cliente.saldo_pendiente"
-              (click)="guardarAbono()"
-            >
-              {{ guardando() ? 'Registrando pago...' : 'Confirmar y Guardar Abono' }}
-            </button>
-          } @else if (clientesConDeuda().length === 0 && !cargando()) {
-            <div class="card-uber-light text-center mt-16" style="padding: 24px;">
-              <p>No hay clientes con deudas pendientes actualmente.</p>
-            </div>
+            </aside>
           }
         </div>
       </div>
@@ -167,8 +175,26 @@ import { ahoraLocalInput, aISO } from '../../core/fecha.utils';
     }
 
     .form-wrapper {
-      max-width: 540px;
-      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Dos columnas que aprovechan el ancho de la pantalla; se apilan en pantallas angostas.
+       Solo se activa la segunda columna cuando hay un cliente seleccionado (con resumen). */
+    .abono-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .abono-layout.has-resumen {
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr);
+    }
+
+    .abono-resumen {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
     .balance-info-box {
@@ -201,6 +227,11 @@ import { ahoraLocalInput, aISO } from '../../core/fecha.utils';
       margin-bottom: 6px;
     }
 
+    .abono-deduct {
+      color: var(--color-black);
+      font-weight: 600;
+    }
+
     .summary-divider {
       height: 1px;
       background-color: var(--color-gray-border);
@@ -223,6 +254,12 @@ import { ahoraLocalInput, aISO } from '../../core/fecha.utils';
       width: 100%;
       padding: 12px;
       font-size: 15px;
+    }
+
+    @media (max-width: 860px) {
+      .abono-layout.has-resumen {
+        grid-template-columns: 1fr;
+      }
     }
   `]
 })
