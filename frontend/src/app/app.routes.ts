@@ -51,12 +51,23 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: 'privacidad',
+    loadComponent: () => import('./pages/legal/legal').then((m) => m.LegalComponent),
+    data: { documento: 'privacidad' },
+  },
+  {
+    path: 'terminos',
+    loadComponent: () => import('./pages/legal/legal').then((m) => m.LegalComponent),
+    data: { documento: 'terminos' },
+  },
+  {
     path: '',
     redirectTo: 'dashboard',
     pathMatch: 'full',
   },
   {
     path: '**',
-    redirectTo: 'dashboard',
+    loadComponent: () =>
+      import('./pages/no-encontrado/no-encontrado').then((m) => m.NoEncontradoComponent),
   },
 ];

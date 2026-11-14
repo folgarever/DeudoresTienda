@@ -76,7 +76,7 @@ import { AuthService } from '../../core/auth.service';
         <!-- Cambio de contraseña -->
         <div class="card-uber profile-card">
           <h2 class="card-title">Cambiar contraseña</h2>
-          <p class="card-subtitle">Usa una contraseña de al menos 6 caracteres.</p>
+          <p class="card-subtitle">Usa una contraseña de al menos 8 caracteres.</p>
 
           <form (ngSubmit)="cambiarPassword()">
             <div class="form-group">
@@ -238,8 +238,8 @@ export class PerfilComponent implements OnInit {
       return;
     }
 
-    if (this.passwordNueva.length < 6) {
-      this.errorMensaje.set('La nueva contraseña debe tener al menos 6 caracteres');
+    if (this.passwordNueva.length < 8) {
+      this.errorMensaje.set('La nueva contraseña debe tener al menos 8 caracteres');
       this.mensajeExito.set(null);
       return;
     }

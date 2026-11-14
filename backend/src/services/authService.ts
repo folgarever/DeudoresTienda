@@ -15,6 +15,7 @@ import { AppError } from '../middlewares/errorHandler';
 
 const MAX_NOMBRE = 100;
 const MAX_APELLIDO = 100;
+const MIN_PASSWORD = 8;
 
 function createAuthError(message: string, statusCode: number = 400): AppError {
   const err = new Error(message) as AppError;
@@ -30,6 +31,14 @@ export class AuthService {
   }
 
   static async registrar(dto: RegistroDTO): Promise<AuthResponse> {
+    // Permite cerrar el registro publico de nuevas cuentas desde el entorno.
+    if (!env.REGISTRATION_ENABLED) {
+      throw createAuthError(
+        'El registro de nuevas cuentas esta deshabilitado. Contacte al administrador.',
+        403
+      );
+    }
+
     const nombres = dto.nombres?.trim();
     const apellidos = dto.apellidos?.trim();
     const email = dto.email?.trim().toLowerCase();
@@ -57,8 +66,8 @@ export class AuthService {
       throw createAuthError('El nombre de usuario debe tener entre 3 y 30 caracteres');
     }
 
-    if (password.length < 6) {
-      throw createAuthError('La contraseña debe tener al menos 6 caracteres');
+    if (password.length < MIN_PASSWORD) {
+      throw createAuthError(`La contraseña debe tener al menos ${MIN_PASSWORD} caracteres`);
     }
 
     // Comprobar si ya existe el correo o el nombre de usuario
@@ -245,8 +254,8 @@ export class AuthService {
       throw createAuthError('Debe ingresar su contraseña actual y la nueva contraseña');
     }
 
-    if (passwordNueva.length < 6) {
-      throw createAuthError('La nueva contraseña debe tener al menos 6 caracteres');
+    if (passwordNueva.length < MIN_PASSWORD) {
+      throw createAuthError(`La nueva contraseña debe tener al menos ${MIN_PASSWORD} caracteres`);
     }
 
     if (passwordNueva === passwordActual) {

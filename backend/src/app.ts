@@ -2,6 +2,7 @@ import express, { Application, Request, Response, Router } from 'express';
 import cors, { CorsOptions } from 'cors';
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
+import { securityHeaders } from './middlewares/securityHeaders';
 import authRoutes from './routes/authRoutes';
 import clienteRoutes from './routes/clienteRoutes';
 import compraRoutes from './routes/compraRoutes';
@@ -21,6 +22,17 @@ export function createApp(): Application {
 
   // Politica de CORS: si se definen origenes permitidos se aplican;
   // de lo contrario se permite cualquiera (util para desarrollo local).
+  //
+  // En produccion conviene restringirla al dominio del frontend. Como la
+  // aplicacion no usa cookies (el token viaja en la cabecera Authorization),
+  // el riesgo de un CORS abierto es bajo, pero se avisa para no dejarlo pasar.
+  if (env.isProduction && env.CORS_ORIGINS.length === 0) {
+    console.warn(
+      '[SEGURIDAD] CORS_ORIGINS no esta definido en produccion: se permiten ' +
+      'peticiones desde cualquier origen. Defina los dominios autorizados.'
+    );
+  }
+
   const corsOptions: CorsOptions = {
     origin: (origin, callback) => {
       if (!origin) {
@@ -38,6 +50,9 @@ export function createApp(): Application {
   };
 
   app.use(cors(corsOptions));
+
+  // Cabeceras de seguridad en todas las respuestas.
+  app.use(securityHeaders);
 
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
