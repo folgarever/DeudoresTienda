@@ -122,6 +122,12 @@ export interface ResumenHistorialCliente {
   movimientos: MovimientoFinanciero[];
 }
 
+export interface SerieDiaDashboard {
+  fecha: string;
+  ventas: number;
+  abonos: number;
+}
+
 export interface DashboardStats {
   total_clientes: number;
   clientes_con_deuda: number;
@@ -132,6 +138,7 @@ export interface DashboardStats {
   compras_recientes: Compra[];
   ultimos_abonos: AbonoPago[];
   top_deudores: Cliente[];
+  serie_ultimos_dias: SerieDiaDashboard[];
 }
 
 export interface ResumenCajaDia {
