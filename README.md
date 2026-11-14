@@ -9,13 +9,15 @@ Aplicación web profesional para la administración de clientes, cuentas por cob
 ## 1. Características Principales
 
 - **Gestión de Clientes:** Registro rápido (nombre y apellido), edición, búsqueda instantánea, paginación, exportación a PDF, desactivación lógica que protege el historial financiero y reactivación de clientes inactivos. Muestra el **último abono** y los **días sin abonar** de cada cliente, con ordenamiento por nombre, mayor deuda o más recientes.
+- **Notas por Cliente:** Campo libre de observaciones (hasta 500 caracteres) por cliente para guardar recordatorios y referencias (ej. "paga los viernes", a qué se dedica, etc.). Se edita desde el modal de clientes y desde la ficha (historial) del cliente, se indica con un ícono en el listado y se incluye como columna en la exportación PDF.
 - **Registro de Compras:** Venta ágil de productos varios con ingreso manual de descripción, cantidad y precio unitario (en Quetzales `Q`) o desde el catálogo de productos frecuentes (selección por categoría o **código de barras**). Cálculo automático de subtotales y total sumado a la deuda. Permite registrar la compra con **fecha retroactiva**.
 - **Abonos y Pagos:** Registro de pagos parciales o liquidación total con validación estricta (no permite abonos negativos ni montos superiores a la deuda). El estado de cada compra (`PENDIENTE` / `PARCIAL` / `PAGADO`) se recalcula automáticamente en orden FIFO. Permite registrar el abono con **fecha retroactiva**.
 - **Anulación de Compras y Abonos:** Reversión transaccional y auditada de una compra o un abono (con motivo opcional). El monto se devuelve a la deuda del cliente, la operación queda marcada como `ANULADA` / `ANULADO` y se excluye de todos los totales (dashboard, cierre de caja e historial), conservando la trazabilidad.
 - **Trazabilidad Financiera:** Historial cronológico inmutable de movimientos con balance anterior y resultante en cada operación. Incluye detalle de productos por compra, filtro por rango de fechas, exportación a PDF e impresión del estado de cuenta.
 - **Catálogo de Productos:** Productos frecuentes con precio sugerido, **categoría** y **código de barras** opcionales, para agregarlos a una venta con un clic (ventas más rápidas) o filtrarlos por categoría.
 - **Cierre de Caja:** Reporte de ventas y abonos por día, semana o mes, con totales, desglose diario, exportación a PDF e impresión.
-- **Dashboard Estadístico:** Indicadores en tiempo real (total deudores, saldo total por cobrar, ventas acumuladas, total vendido y clientes con mayor deuda).
+- **Dashboard Estadístico:** Indicadores en tiempo real (total deudores, saldo total por cobrar, ventas acumuladas, total vendido y clientes con mayor deuda) y una **gráfica de barras** monocromática con las ventas y los abonos de los últimos 14 días.
+- **Aplicación Instalable (PWA):** Puede instalarse en el teléfono, la tablet o la computadora ("Agregar a la pantalla de inicio") con ícono propio y abrirse como aplicación de pantalla completa. Incluye un *service worker* que precarga la interfaz y permite abrirla sin conexión (los datos de la API siempre se consultan en línea).
 - **Modo Oscuro:** Tema claro/oscuro conmutable desde la barra de navegación, con preferencia persistida en el navegador y aplicación sin parpadeo. La impresión siempre usa la paleta clara.
 - **Perfil de Usuario:** Edición de nombres y apellidos, además de cambio de contraseña autenticado.
 - **Seguridad:** Tokens JWT, contraseñas cifradas con `bcrypt`, limitador de intentos de autenticación, saneamiento de filtros de búsqueda, CORS configurable y ocultamiento de errores internos en producción.
@@ -49,7 +51,7 @@ DeudoresTienda/
    - `Anon / Public Key`
    - `Service Role Key` (utilizada únicamente en el backend protegido).
 
-> **Migraciones:** si ya tenía una base de datos creada con una versión anterior del esquema, vuelva a ejecutar `supabase/schema.sql`. El script usa `CREATE OR REPLACE`, `CREATE TABLE IF NOT EXISTS` y `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, por lo que actualizará las funciones existentes y agregará las columnas nuevas (`compras.anulada` / `abonos_pagos.anulado` con su motivo y fecha, `productos.categoria` y `productos.codigo`) sin perder datos. Esta versión incorpora la sección **MIGRACIONES INCREMENTALES** al final del archivo para bases de datos ya existentes.
+> **Migraciones:** si ya tenía una base de datos creada con una versión anterior del esquema, vuelva a ejecutar `supabase/schema.sql`. El script usa `CREATE OR REPLACE`, `CREATE TABLE IF NOT EXISTS` y `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, por lo que actualizará las funciones existentes y agregará las columnas nuevas (`clientes.notas`, `compras.anulada` / `abonos_pagos.anulado` con su motivo y fecha, `productos.categoria` y `productos.codigo`) sin perder datos. Esta versión incorpora la sección **MIGRACIONES INCREMENTALES** al final del archivo para bases de datos ya existentes.
 
 ---
 
@@ -104,14 +106,15 @@ npm run build      # Genera bundle optimizado de produccion
 ## 7. Módulos y Flujo Operativo
 
 - **Autenticación:** `/login` y `/registro` con validación de credenciales únicas y contraseñas cifradas con `bcrypt`.
-- **Dashboard:** `/dashboard` con indicadores en tiempo real (clientes, deudores, total por cobrar `Q`, ventas, total vendido, abonos y Top 10 deudores).
-- **Clientes:** `/clientes` con buscador en vivo, filtro de deudores, filtro para mostrar inactivos, ordenamiento (nombre, mayor deuda, más recientes), columnas de **último abono** y **días sin abonar**, paginación, exportación a PDF, creación rápida (sólo Nombre y Apellido), desactivación lógica que protege el historial y reactivación de clientes.
+- **Dashboard:** `/dashboard` con indicadores en tiempo real (clientes, deudores, total por cobrar `Q`, ventas, total vendido, abonos y Top 10 deudores) y una **gráfica de barras** de ventas y abonos de los últimos 14 días.
+- **Clientes:** `/clientes` con buscador en vivo, filtro de deudores, filtro para mostrar inactivos, ordenamiento (nombre, mayor deuda, más recientes), columnas de **último abono** y **días sin abonar**, **notas por cliente**, paginación, exportación a PDF, creación rápida (sólo Nombre y Apellido), desactivación lógica que protege el historial y reactivación de clientes.
 - **Ventas y Compras:** `/ventas/nueva` para agregar productos libres (o desde el catálogo, filtrando por categoría o código de barras) con cantidad y precio unitario; permite fecha retroactiva y suma atómicamente a la deuda pendiente del cliente.
 - **Abonos y Pagos:** `/abonos/nuevo` con botón de pago completo, fecha retroactiva, validación estricta que prohíbe abonos negativos o mayores a la deuda y resta el saldo pendiente en tiempo real.
-- **Historial Individual:** `/clientes/:id/historial` con resumen acumulado, detalle de productos por compra, filtro por rango de fechas, **anulación de compras y abonos** (con motivo opcional), exportación a PDF e impresión del estado de cuenta.
+- **Historial Individual:** `/clientes/:id/historial` con resumen acumulado, detalle de productos por compra, filtro por rango de fechas, **notas del cliente** (edición en línea), **anulación de compras y abonos** (con motivo opcional), exportación a PDF e impresión del estado de cuenta.
 - **Cierre de Caja:** `/reportes` con presets (hoy, esta semana, este mes, mes anterior), tarjetas de totales, desglose diario, exportación a PDF e impresión.
 - **Catálogo de Productos:** `/productos` para administrar productos frecuentes con precio, **categoría** y **código de barras** opcionales, y agregarlos a una venta con un clic.
 - **Modo Oscuro:** botón de tema en la barra de navegación (disponible también sin sesión); la preferencia se guarda en el navegador y se aplica sin parpadeo al cargar.
+- **Aplicación Instalable (PWA):** la interfaz incluye `manifest.webmanifest` y un *service worker* (`frontend/public/sw.js`), por lo que puede instalarse como aplicación y abrirse sin conexión (con los datos de la API siempre en línea).
 - **Mi Perfil:** `/perfil` para editar nombres y apellidos y cambiar la contraseña.
 
 ---
@@ -128,9 +131,9 @@ Todas las rutas (excepto autenticación) requieren el encabezado `Authorization:
 | `PUT` | `/api/auth/profile` | Actualizar nombres y apellidos |
 | `PUT` | `/api/auth/password` | Cambiar la contraseña |
 | `GET` | `/api/clientes` | Listar clientes (`search`, `soloConDeuda`, `incluirInactivos`, `orden`, `page`, `limit`). `orden` acepta `nombre`, `saldo` o `reciente`. |
-| `POST` | `/api/clientes` | Crear un cliente |
+| `POST` | `/api/clientes` | Crear un cliente (`nombre`, `apellido`, `notas?`) |
 | `GET` | `/api/clientes/:id` | Obtener un cliente |
-| `PUT` | `/api/clientes/:id` | Actualizar un cliente |
+| `PUT` | `/api/clientes/:id` | Actualizar un cliente (`nombre`, `apellido`, `notas?`) |
 | `PATCH` | `/api/clientes/:id/reactivar` | Reactivar un cliente inactivo |
 | `DELETE` | `/api/clientes/:id` | Desactivar un cliente (borrado lógico) |
 | `GET` | `/api/compras` | Listar compras (`cliente_id`, `incluirAnuladas`, `limit`, `page`) |
@@ -142,7 +145,7 @@ Todas las rutas (excepto autenticación) requieren el encabezado `Authorization:
 | `GET` | `/api/abonos/:id` | Obtener un abono |
 | `POST` | `/api/abonos/:id/anular` | Anular un abono y devolver su monto a la deuda (`motivo` opcional) |
 | `GET` | `/api/historial/cliente/:id` | Historial financiero de un cliente |
-| `GET` | `/api/dashboard` | Métricas del panel de control |
+| `GET` | `/api/dashboard` | Métricas del panel de control (`dias`, `tzOffset`). `dias` define la serie de ventas y abonos por día (por defecto 14, máximo 90). |
 | `GET` | `/api/reportes/resumen` | Cierre de caja por rango (`desde`, `hasta`, `tzOffset`) |
 | `GET` | `/api/productos` | Listar productos (`search`, `categoria`, `incluirInactivos`, `page`, `limit`) |
 | `GET` | `/api/productos/categorias` | Listar las categorías existentes (para filtros y autocompletado) |

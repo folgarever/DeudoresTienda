@@ -6,12 +6,25 @@ import { AppError } from '../middlewares/errorHandler';
 
 const MAX_NOMBRE = 100;
 const MAX_APELLIDO = 100;
+const MAX_NOTAS = 500;
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 function createClienteError(message: string, statusCode: number = 400): AppError {
   const err = new Error(message) as AppError;
   err.statusCode = statusCode;
   return err;
+}
+
+// Normaliza las notas: recorta espacios, valida la longitud y convierte el
+// texto vacio en NULL para no guardar cadenas en blanco.
+function normalizarNotas(notas?: string | null): string | null {
+  if (notas === null || notas === undefined) return null;
+  const texto = String(notas).trim();
+  if (texto.length === 0) return null;
+  if (texto.length > MAX_NOTAS) {
+    throw createClienteError(`Las notas no pueden superar los ${MAX_NOTAS} caracteres`);
+  }
+  return texto;
 }
 
 function normalizarCliente(c: Record<string, unknown>): Cliente {
@@ -49,6 +62,7 @@ export class ClienteService {
         user_id: userId,
         nombre,
         apellido,
+        notas: normalizarNotas(dto.notas),
         saldo_pendiente: 0.00,
         activo: true,
       })
@@ -199,13 +213,21 @@ export class ClienteService {
     // Verificar existencia del cliente
     await this.obtenerPorId(userId, clienteId);
 
+    const cambios: Record<string, unknown> = {
+      nombre,
+      apellido,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Solo se actualizan las notas cuando el cliente las envia, para no borrarlas
+    // sin intencion desde llamadas parciales.
+    if (dto.notas !== undefined) {
+      cambios['notas'] = normalizarNotas(dto.notas);
+    }
+
     const { data: clienteActualizado, error } = await supabase
       .from('clientes')
-      .update({
-        nombre,
-        apellido,
-        updated_at: new Date().toISOString(),
-      })
+      .update(cambios)
       .eq('id', clienteId)
       .eq('user_id', userId)
       .select('*')

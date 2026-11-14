@@ -6,9 +6,9 @@ export class ClienteController {
   static async crear(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
-      const { nombre, apellido } = req.body;
+      const { nombre, apellido, notas } = req.body;
 
-      const cliente = await ClienteService.crear(userId, { nombre, apellido });
+      const cliente = await ClienteService.crear(userId, { nombre, apellido, notas });
 
       res.status(201).json({
         success: true,
@@ -71,9 +71,9 @@ export class ClienteController {
     try {
       const userId = req.user!.id;
       const { id } = req.params;
-      const { nombre, apellido } = req.body;
+      const { nombre, apellido, notas } = req.body;
 
-      const cliente = await ClienteService.actualizar(userId, id, { nombre, apellido });
+      const cliente = await ClienteService.actualizar(userId, id, { nombre, apellido, notas });
 
       res.status(200).json({
         success: true,

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { DashboardService } from '../../services/dashboard.service';
@@ -95,6 +95,33 @@ import { DashboardStats } from '../../models';
             <span class="stat-meta">Dinero recuperado</span>
           </div>
         </div>
+
+        <!-- Gráfica: Ventas y Abonos de los últimos días -->
+        @if (serieChart().length > 0) {
+          <div class="card-uber chart-card">
+            <div class="chart-head">
+              <div>
+                <h2 class="section-title">Ventas y Abonos (últimos {{ serieChart().length }} días)</h2>
+                <p class="text-muted">Comparativa diaria de lo vendido y lo cobrado</p>
+              </div>
+              <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot dot-ventas"></span>Ventas</span>
+                <span class="legend-item"><span class="legend-dot dot-abonos"></span>Abonos</span>
+              </div>
+            </div>
+            <div class="chart-bars">
+              @for (d of serieChart(); track d.fecha) {
+                <div class="chart-col" [title]="d.titulo">
+                  <div class="chart-pair">
+                    <div class="bar bar-ventas" [style.height.%]="d.ventasPct"></div>
+                    <div class="bar bar-abonos" [style.height.%]="d.abonosPct"></div>
+                  </div>
+                  <span class="chart-label">{{ d.etiqueta }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
 
         <!-- Seccion: Clientes con Mayor Deuda -->
         <div class="section-container">
@@ -260,6 +287,89 @@ import { DashboardStats } from '../../models';
       gap: 16px;
       margin-bottom: 32px;
     }
+    .chart-card {
+      margin-bottom: 32px;
+      padding: 20px;
+    }
+    .chart-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .chart-head .section-title {
+      font-size: 20px;
+      margin-bottom: 2px;
+    }
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--color-gray-secondary);
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+    .dot-ventas {
+      background-color: var(--color-black);
+    }
+    .dot-abonos {
+      background-color: #B9B9B9;
+    }
+    .chart-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 200px;
+      padding-top: 8px;
+      border-bottom: 1px solid var(--color-gray-border);
+      overflow-x: auto;
+    }
+    .chart-col {
+      flex: 1 1 0;
+      min-width: 20px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+    .chart-pair {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 3px;
+      width: 100%;
+      height: 100%;
+    }
+    .bar {
+      width: 42%;
+      max-width: 16px;
+      border-radius: 3px 3px 0 0;
+      transition: height 0.3s ease;
+    }
+    .bar-ventas {
+      background-color: var(--color-black);
+    }
+    .bar-abonos {
+      background-color: #B9B9B9;
+    }
+    .chart-label {
+      font-size: 11px;
+      color: var(--color-gray-secondary);
+      white-space: nowrap;
+    }
     .stat-card {
       display: flex;
       flex-direction: column;
@@ -379,6 +489,23 @@ export class DashboardComponent implements OnInit {
   stats = signal<DashboardStats | null>(null);
   cargando = signal<boolean>(true);
   error = signal<string | null>(null);
+
+  // Prepara la serie diaria para la grafica de barras (porcentajes relativos al maximo).
+  serieChart = computed(() => {
+    const serie = this.stats()?.serie_ultimos_dias ?? [];
+    const max = Math.max(1, ...serie.map((d) => Math.max(d.ventas, d.abonos)));
+    return serie.map((d) => {
+      const fecha = new Date(`${d.fecha}T00:00:00`);
+      const etiqueta = `${fecha.getDate()}/${fecha.getMonth() + 1}`;
+      return {
+        fecha: d.fecha,
+        etiqueta,
+        ventasPct: Math.round((d.ventas / max) * 100),
+        abonosPct: Math.round((d.abonos / max) * 100),
+        titulo: `${etiqueta} · Ventas: Q${d.ventas.toFixed(2)} · Abonos: Q${d.abonos.toFixed(2)}`,
+      };
+    });
+  });
 
   ngOnInit(): void {
     this.cargarMetricas();

@@ -5,6 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HistorialService } from '../../services/historial.service';
 import { CompraService } from '../../services/compra.service';
 import { AbonoService } from '../../services/abono.service';
+import { ClienteService } from '../../services/cliente.service';
 import { AbonoPago, Compra, MovimientoFinanciero, ResumenHistorialCliente } from '../../models';
 import { dentroDeRango, fechaCorta, hoyInput, primerDiaMesInput } from '../../core/fecha.utils';
 import { descargarPDF, imprimir } from '../../core/exportar.utils';
@@ -51,6 +52,40 @@ import { descargarPDF, imprimir } from '../../core/exportar.utils';
                 Imprimir estado de cuenta
               </button>
             </div>
+          </div>
+
+          <!-- Notas del cliente (recordatorios y referencias) -->
+          <div class="notas-card no-print mt-16">
+            <div class="notas-head">
+              <span class="notas-titulo">📝 Notas del cliente</span>
+              @if (!editandoNotas()) {
+                <button type="button" class="btn-uber btn-sm btn-uber-outline" (click)="editarNotas()">
+                  {{ h.cliente.notas ? 'Editar nota' : 'Agregar nota' }}
+                </button>
+              }
+            </div>
+
+            @if (editandoNotas()) {
+              <textarea
+                class="form-control"
+                rows="3"
+                maxlength="500"
+                [(ngModel)]="formNotas"
+                placeholder="Ej. Paga los viernes, trabaja en..., referencia, etc."
+              ></textarea>
+              <div class="notas-actions">
+                <button type="button" class="btn-uber btn-sm btn-uber-outline" (click)="cancelarNotas()">
+                  Cancelar
+                </button>
+                <button type="button" class="btn-uber btn-sm" [disabled]="guardandoNotas()" (click)="guardarNotas()">
+                  {{ guardandoNotas() ? 'Guardando...' : 'Guardar nota' }}
+                </button>
+              </div>
+            } @else if (h.cliente.notas) {
+              <p class="notas-texto">{{ h.cliente.notas }}</p>
+            } @else {
+              <p class="notas-texto text-muted">Sin notas. Agrega un recordatorio o referencia para este cliente.</p>
+            }
           </div>
         }
       </div>
@@ -315,6 +350,43 @@ import { descargarPDF, imprimir } from '../../core/exportar.utils';
       flex-wrap: wrap;
     }
 
+    .notas-card {
+      margin-top: 16px;
+      padding: 14px 18px;
+      border: 1px solid var(--color-gray-border);
+      border-radius: var(--radius-uber);
+      background-color: var(--color-gray-light);
+    }
+
+    .notas-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .notas-titulo {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-gray-secondary);
+    }
+
+    .notas-texto {
+      white-space: pre-wrap;
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .notas-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -531,6 +603,7 @@ export class HistorialComponent implements OnInit {
   private historialService = inject(HistorialService);
   private compraService = inject(CompraService);
   private abonoService = inject(AbonoService);
+  private clienteService = inject(ClienteService);
   private route = inject(ActivatedRoute);
 
   historial = signal<ResumenHistorialCliente | null>(null);
@@ -538,6 +611,10 @@ export class HistorialComponent implements OnInit {
   errorMensaje = signal<string | null>(null);
   mensajeExito = signal<string | null>(null);
   avisoError = signal<string | null>(null);
+
+  editandoNotas = signal<boolean>(false);
+  guardandoNotas = signal<boolean>(false);
+  formNotas = '';
 
   compras = signal<Compra[]>([]);
   cargandoCompras = signal<boolean>(true);
@@ -704,6 +781,50 @@ export class HistorialComponent implements OnInit {
     this.mensajeExito.set(mensaje);
     if (this.temporizadorExito) clearTimeout(this.temporizadorExito);
     this.temporizadorExito = setTimeout(() => this.mensajeExito.set(null), 4000);
+  }
+
+  // --- Notas del cliente ---
+
+  editarNotas(): void {
+    this.formNotas = this.historial()?.cliente.notas || '';
+    this.avisoError.set(null);
+    this.editandoNotas.set(true);
+  }
+
+  cancelarNotas(): void {
+    this.editandoNotas.set(false);
+    this.formNotas = '';
+  }
+
+  guardarNotas(): void {
+    const h = this.historial();
+    if (!h) return;
+
+    const texto = this.formNotas.trim();
+    this.guardandoNotas.set(true);
+    this.avisoError.set(null);
+
+    this.clienteService
+      .actualizar(h.cliente.id, {
+        nombre: h.cliente.nombre,
+        apellido: h.cliente.apellido,
+        notas: texto,
+      })
+      .subscribe({
+        next: () => {
+          this.guardandoNotas.set(false);
+          this.editandoNotas.set(false);
+          this.historial.set({
+            ...h,
+            cliente: { ...h.cliente, notas: texto || null },
+          });
+          this.mostrarExito('Notas del cliente guardadas.');
+        },
+        error: (err) => {
+          this.guardandoNotas.set(false);
+          this.avisoError.set(err.error?.message || 'Error al guardar las notas del cliente');
+        }
+      });
   }
 
   // --- Exportación e impresión ---

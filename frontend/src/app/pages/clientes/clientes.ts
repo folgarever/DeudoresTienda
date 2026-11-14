@@ -113,6 +113,9 @@ import { fechaCorta } from '../../core/fecha.utils';
                     <a [routerLink]="['/clientes', c.id, 'historial']" class="client-link">
                       {{ c.nombre }} {{ c.apellido }}
                     </a>
+                    @if (c.notas) {
+                      <span class="nota-indicador" [title]="c.notas" aria-label="Este cliente tiene notas">📝</span>
+                    }
                   </td>
                   <td>
                     @if (!c.activo) {
@@ -227,6 +230,22 @@ import { fechaCorta } from '../../core/fecha.utils';
                 />
               </div>
 
+              <div class="form-group">
+                <label class="form-label" for="notas">Notas (Opcional)</label>
+                <textarea
+                  id="notas"
+                  class="form-control"
+                  rows="3"
+                  maxlength="500"
+                  [(ngModel)]="formNotas"
+                  name="formNotas"
+                  placeholder="Ej. Paga los viernes, trabaja en..., referencia, etc."
+                ></textarea>
+                <span class="field-hint text-muted">
+                  Recordatorios o referencias del cliente. Se muestran en su ficha (historial).
+                </span>
+              </div>
+
               <div class="modal-actions">
                 <button type="button" class="btn-uber btn-uber-outline" (click)="cerrarModal()">
                   Cancelar
@@ -330,6 +349,17 @@ import { fechaCorta } from '../../core/fecha.utils';
     .client-link {
       text-decoration: underline;
     }
+    .nota-indicador {
+      margin-left: 6px;
+      font-size: 13px;
+      cursor: help;
+    }
+    .field-hint {
+      display: block;
+      font-size: 12px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
     .debt-color {
       color: var(--color-black);
     }
@@ -428,6 +458,7 @@ export class ClientesComponent implements OnInit {
   clienteEnEdicion = signal<Cliente | null>(null);
   formNombre = '';
   formApellido = '';
+  formNotas = '';
   private temporizadorExito?: ReturnType<typeof setTimeout>;
 
   ngOnInit(): void {
@@ -490,6 +521,7 @@ export class ClientesComponent implements OnInit {
             c.ultimo_abono ? fechaCorta(c.ultimo_abono) : 'Sin abonos',
             c.dias_sin_abonar === null || c.dias_sin_abonar === undefined ? '—' : String(c.dias_sin_abonar),
             c.activo ? (c.saldo_pendiente > 0 ? 'Con deuda' : 'Al dia') : 'Inactivo',
+            c.notas || '',
           ]);
 
           const totalDeuda = lista.reduce((suma, c) => suma + c.saldo_pendiente, 0);
@@ -498,7 +530,7 @@ export class ClientesComponent implements OnInit {
             titulo: 'Directorio de Clientes',
             subtitulo: `${lista.length} cliente(s) · Deuda total: Q${totalDeuda.toFixed(2)}`,
             nombreArchivo: 'clientes',
-            encabezados: ['Cliente', 'Saldo (Q)', 'Último abono', 'Días sin abonar', 'Estado'],
+            encabezados: ['Cliente', 'Saldo (Q)', 'Último abono', 'Días sin abonar', 'Estado', 'Notas'],
             filas,
             alineaciones: { 1: 'right', 3: 'right' },
           });
@@ -521,6 +553,7 @@ export class ClientesComponent implements OnInit {
     this.clienteEnEdicion.set(null);
     this.formNombre = '';
     this.formApellido = '';
+    this.formNotas = '';
     this.mostrarModal.set(true);
   }
 
@@ -528,6 +561,7 @@ export class ClientesComponent implements OnInit {
     this.clienteEnEdicion.set(cliente);
     this.formNombre = cliente.nombre;
     this.formApellido = cliente.apellido;
+    this.formNotas = cliente.notas || '';
     this.mostrarModal.set(true);
   }
 
@@ -547,7 +581,8 @@ export class ClientesComponent implements OnInit {
 
     const dto = {
       nombre: this.formNombre.trim(),
-      apellido: this.formApellido.trim()
+      apellido: this.formApellido.trim(),
+      notas: this.formNotas.trim()
     };
 
     const edicion = this.clienteEnEdicion();

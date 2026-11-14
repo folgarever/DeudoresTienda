@@ -37,11 +37,11 @@ export class ClienteService {
     return this.http.get<{ success: boolean; data: Cliente }>(`${this.apiUrl}/${id}`);
   }
 
-  crear(cliente: { nombre: string; apellido: string }): Observable<{ success: boolean; data: Cliente; message?: string }> {
+  crear(cliente: { nombre: string; apellido: string; notas?: string }): Observable<{ success: boolean; data: Cliente; message?: string }> {
     return this.http.post<{ success: boolean; data: Cliente; message?: string }>(this.apiUrl, cliente);
   }
 
-  actualizar(id: string, cliente: { nombre: string; apellido: string }): Observable<{ success: boolean; data: Cliente; message?: string }> {
+  actualizar(id: string, cliente: { nombre: string; apellido: string; notas?: string }): Observable<{ success: boolean; data: Cliente; message?: string }> {
     return this.http.put<{ success: boolean; data: Cliente; message?: string }>(`${this.apiUrl}/${id}`, cliente);
   }
 
